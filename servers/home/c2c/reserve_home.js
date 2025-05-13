@@ -1,13 +1,13 @@
-const HOME_RESERVE_PORT = 9003
+import { HOME_RESERVE_PORT } from '../helpers/ports.js';
 
 /** @param {NS} ns */
 export async function main(ns) {
-  const args = ns.flags([["help", false]]);
+  const args = ns.flags([['help', false]]);
 
   if (args.help || args._.length < 1) {
-    ns.tprint("Set GB of RAM to keep free when C2C handles home");
+    ns.tprint('Set GB of RAM to keep free when C2C handles home');
     ns.tprint(`Usage: run ${ns.getScriptName()} GB`);
-    ns.tprint("Example:");
+    ns.tprint('Example:');
     ns.tprint(`> run ${ns.getScriptName()} 12.5`);
     return;
   }
@@ -15,5 +15,5 @@ export async function main(ns) {
   const keepFree = parseFloat(args._[0]) || 0;
 
   ns.clearPort(HOME_RESERVE_PORT);
-  ns.writePort(HOME_RESERVE_PORT, keepFree)
+  ns.writePort(HOME_RESERVE_PORT, keepFree);
 }

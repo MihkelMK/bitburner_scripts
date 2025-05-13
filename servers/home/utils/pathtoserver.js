@@ -7,7 +7,7 @@ export function autocomplete(data, args) {
   const servers = data.servers;
 
   if (args[0]) {
-    return servers.filter((server) => server.startsWith(args[0]))
+    return servers.filter((server) => server.startsWith(args[0]));
   }
 
   return servers;
@@ -17,15 +17,15 @@ export function autocomplete(data, args) {
 export async function main(ns) {
   // Check if arguments were provided
   if (ns.args.length < 1) {
-    ns.tprint("Usage: run find-path.js [target-hostname]");
+    ns.tprint('Usage: run find-path.js [target-hostname]');
     return;
   }
 
   const targetHost = ns.args[0];
   let scanRange = 3;
 
-  if (ns.fileExists("DeepscanV1.exe")) scanRange = 5;
-  if (ns.fileExists("DeepscanV2.exe")) scanRange = 10;
+  if (ns.fileExists('DeepscanV1.exe')) scanRange = 5;
+  if (ns.fileExists('DeepscanV2.exe')) scanRange = 10;
 
   const currentHost = ns.getHostname();
 
@@ -42,7 +42,7 @@ export async function main(ns) {
     ns.tprint(`No path found to ${targetHost}`);
   } else {
     // Format and display the path with special markers for servers outside scan range
-    let formattedPath = "";
+    let formattedPath = '';
     let currentDepth = 0;
 
     path.forEach((server, index) => {
@@ -52,9 +52,9 @@ export async function main(ns) {
         currentDepth = getDistance(ns, currentHost, server);
 
         if (currentDepth > scanRange) {
-          formattedPath += " |-> " + server;
+          formattedPath += ' |-> ' + server;
         } else {
-          formattedPath += " -> " + server;
+          formattedPath += ' -> ' + server;
         }
       }
     });
@@ -242,3 +242,4 @@ function reconstructPath(target, parent, start) {
   path.unshift(start);
   return path;
 }
+

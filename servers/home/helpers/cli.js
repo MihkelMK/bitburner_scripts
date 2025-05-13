@@ -1,11 +1,11 @@
-/** 
+/**
  * Disable certain logs from appearing in CLI output. ALL silences everything.
  * @param {NS} ns
  * @param {string[]} logs Log types to disable
-*/
+ */
 export function disable_logs(ns, logs) {
   for (var i in logs) {
-    ns.disableLog(logs[i])
+    ns.disableLog(logs[i]);
   }
 }
 
@@ -15,17 +15,17 @@ export function disable_logs(ns, logs) {
  * @param {string} message
  * @param {string} prefix Display toast message with this at the start (eg. "c2c")
  * @param {"success" | "warning" | "error" | "info" | undefined} variant Type of the toast message (default "info")
-*/
-export function notify(ns, message, prefix, variant = "info") {
+ */
+export function notify(ns, message, prefix, variant = 'info') {
   if (!message) return;
 
   // Add timestamp to print calls
-  const timestamp = new Date().toLocaleTimeString("et");
+  const timestamp = new Date().toLocaleTimeString('et');
   ns.print(`[${timestamp}] ${message}`);
 
   // Only show toast if prefix is provided
   if (prefix) {
-    ns.toast(prefix + ": " + message, variant);
+    ns.toast(prefix + ': ' + message, variant);
   }
 }
 
@@ -37,7 +37,7 @@ export function notify(ns, message, prefix, variant = "info") {
  */
 export function formatNumber(value, decimals) {
   if (value === null || value === undefined || isNaN(value)) {
-    return "0";
+    return '0';
   }
 
   // Handle negative values
@@ -74,3 +74,4 @@ export function formatNumber(value, decimals) {
 export function formatCurrency(value, decimals = 1, currency = '$') {
   return currency + formatNumber(value, decimals);
 }
+

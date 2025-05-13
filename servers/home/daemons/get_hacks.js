@@ -5,16 +5,16 @@ export async function main(ns) {
   while (total_hacks < 5) {
     if (!ns.hasTorRouter()) {
       ns.singularity.purchaseTor();
-      continue
+      continue;
     }
 
     let hacks_dict = {
-      "brute": ns.fileExists("BruteSSH.exe"),
-      "ftp": ns.fileExists("FTPCrack.exe"),
-      "http": ns.fileExists("HTTPWorm.exe"),
-      "sql": ns.fileExists("SQLInject.exe"),
-      "smtp": ns.fileExists("relaySMTP.exe"),
-    }
+      brute: ns.fileExists('BruteSSH.exe'),
+      ftp: ns.fileExists('FTPCrack.exe'),
+      http: ns.fileExists('HTTPWorm.exe'),
+      sql: ns.fileExists('SQLInject.exe'),
+      smtp: ns.fileExists('relaySMTP.exe'),
+    };
 
     const available = ns.singularity.getDarkwebPrograms();
 
@@ -23,12 +23,18 @@ export async function main(ns) {
 
       if (script && hacks_dict[script]) continue;
 
-      if (ns.singularity.getDarkwebProgramCost(script) <= ns.getServerMoneyAvailable("home")) {
-        ns.singularity.purchaseProgram(script)
+      if (
+        ns.singularity.getDarkwebProgramCost(script) <=
+        ns.getServerMoneyAvailable('home')
+      ) {
+        ns.singularity.purchaseProgram(script);
       }
     }
 
-    total_hacks = Object.entries(hacks_dict).filter(([name, exists]) => exists).length
-    await ns.sleep(1000 * 60 * 2)
+    total_hacks = Object.entries(hacks_dict).filter(
+      ([name, exists]) => exists
+    ).length;
+    await ns.sleep(1000 * 60 * 2);
   }
 }
+

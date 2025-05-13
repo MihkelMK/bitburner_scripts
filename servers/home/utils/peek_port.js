@@ -1,4 +1,4 @@
-import {ALL_PORTS} from "/helpers/ports.js"
+import { ALL_PORTS } from '../helpers/ports.js';
 
 /**
  * @param {AutocompleteData} data - context about the game, useful when autocompleting
@@ -7,7 +7,7 @@ import {ALL_PORTS} from "/helpers/ports.js"
  */
 export function autocomplete(data, args) {
   if (args[0]) {
-    return ALL_PORTS.filter((port) => String(port).startsWith(args[0]))
+    return ALL_PORTS.filter((port) => String(port).startsWith(args[0]));
   }
 
   return ALL_PORTS;
@@ -15,12 +15,12 @@ export function autocomplete(data, args) {
 
 /** @param {NS} ns */
 export async function main(ns) {
-  const args = ns.flags([["help", false]]);
+  const args = ns.flags([['help', false]]);
 
   if (args.help || args._.length < 1) {
-    ns.tprint("Peek the value of a PORT");
+    ns.tprint('Peek the value of a PORT');
     ns.tprint(`Usage: run ${ns.getScriptName()} PORT`);
-    ns.tprint("Example:");
+    ns.tprint('Example:');
     ns.tprint(`> run ${ns.getScriptName()} 9000`);
     return;
   }
@@ -30,3 +30,4 @@ export async function main(ns) {
 
   ns.tprint(value);
 }
+

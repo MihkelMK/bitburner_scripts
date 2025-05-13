@@ -1,14 +1,14 @@
 /** @param {NS} ns */
 export async function main(ns) {
   // Disable default logs to avoid spam
-  ns.disableLog("ALL");
+  ns.disableLog('ALL');
 
   // Create a map to store solution inputs for different contracts
   const solutionInputs = new Map();
 
   // Create UI container if it doesn't exist
-  let doc = eval("document");
-  let contractUI = doc.getElementById("contract-tracker-ui");
+  let doc = eval('document');
+  let contractUI = doc.getElementById('contract-tracker-ui');
 
   if (contractUI) {
     // Remove existing UI if it's already there (for refreshing/restarting)
@@ -16,160 +16,163 @@ export async function main(ns) {
   }
 
   // Create UI container
-  contractUI = doc.createElement("div");
-  contractUI.id = "contract-tracker-ui";
+  contractUI = doc.createElement('div');
+  contractUI.id = 'contract-tracker-ui';
 
   // Set styles for the UI container
   Object.assign(contractUI.style, {
-    position: "absolute",
-    top: "40px",
-    right: "10px",
-    width: "600px",
+    position: 'absolute',
+    top: '40px',
+    right: '10px',
+    width: '600px',
     minHeight: '33px',
     minWidth: '600px',
     maxWidth: 'calc(100dvh-100px)',
-    backgroundColor: "#000000",
-    color: "rgb(0, 204, 0)",
-    padding: "0", // Removed padding to make titlebar flush with edge
-    zIndex: "1000",
+    backgroundColor: '#000000',
+    color: 'rgb(0, 204, 0)',
+    padding: '0', // Removed padding to make titlebar flush with edge
+    zIndex: '1000',
     fontFamily: 'JetBrainsMono, "Courier New", monospace',
-    fontSize: "1.25rem",
-    fontWeight: "1.5",
-    overflow: "hidden", // Changed from auto to hidden
-    display: "flex",
-    flexDirection: "column"
+    fontSize: '1.25rem',
+    fontWeight: '1.5',
+    overflow: 'hidden', // Changed from auto to hidden
+    display: 'flex',
+    flexDirection: 'column',
   });
 
   // Create header bar (will remain visible when minimized)
-  const headerBar = doc.createElement("div");
-  headerBar.style.display = "flex";
-  headerBar.style.justifyContent = "space-between";
-  headerBar.style.minHeight = "33px";
-  headerBar.style.alignItems = "center";
-  headerBar.style.backgroundColor = "#000000";
-  headerBar.style.padding = "0";
-  headerBar.style.boxShadow = "rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px";
-  headerBar.style.border = "1px solid rgb(68, 68, 68)"
+  const headerBar = doc.createElement('div');
+  headerBar.style.display = 'flex';
+  headerBar.style.justifyContent = 'space-between';
+  headerBar.style.minHeight = '33px';
+  headerBar.style.alignItems = 'center';
+  headerBar.style.backgroundColor = '#000000';
+  headerBar.style.padding = '0';
+  headerBar.style.boxShadow =
+    'rgba(0, 0, 0, 0.2) 0px 2px 1px -1px, rgba(0, 0, 0, 0.14) 0px 1px 1px 0px, rgba(0, 0, 0, 0.12) 0px 1px 3px 0px';
+  headerBar.style.border = '1px solid rgb(68, 68, 68)';
   contractUI.appendChild(headerBar);
 
   // Title in header
-  const title = doc.createElement("div");
+  const title = doc.createElement('div');
   title.innerHTML = `<span style='color: rgb(0, 204, 0);'>${ns.getScriptName()}</span>`;
   headerBar.appendChild(title);
 
   // Status display (will be hidden when minimized)
-  const status = doc.createElement("div");
-  status.id = "contract-status";
-  status.innerText = "Loading...";
-  status.style.marginLeft = "16px";
-  status.style.marginRight = "auto";
-  status.style.fontSize = "16px";
+  const status = doc.createElement('div');
+  status.id = 'contract-status';
+  status.innerText = 'Loading...';
+  status.style.marginLeft = '16px';
+  status.style.marginRight = 'auto';
+  status.style.fontSize = '16px';
   headerBar.appendChild(status);
 
   // Button container
-  const buttonContainer = doc.createElement("div");
-  buttonContainer.style.display = "flex";
+  const buttonContainer = doc.createElement('div');
+  buttonContainer.style.display = 'flex';
   headerBar.appendChild(buttonContainer);
 
   // Minimize/maximize button
-  const minimizeBtn = doc.createElement("button");
-  minimizeBtn.id = "contract-minimize-btn";
-  minimizeBtn.style.backgroundColor = "transparent";
-  minimizeBtn.style.color = "rgb(0, 204, 0)";
-  minimizeBtn.style.borderWidth = "0px 0px 0px 1px";
-  minimizeBtn.style.border = "solid rbg(68, 68, 68)";
-  minimizeBtn.style.width = "24px";
-  minimizeBtn.style.height = "24px";
-  minimizeBtn.style.display = "flex";
-  minimizeBtn.style.alignItems = "center";
-  minimizeBtn.style.justifyContent = "center";
-  minimizeBtn.style.cursor = "pointer";
-  minimizeBtn.style.fontSize = "23px";
-  minimizeBtn.style.padding = "0";
+  const minimizeBtn = doc.createElement('button');
+  minimizeBtn.id = 'contract-minimize-btn';
+  minimizeBtn.style.backgroundColor = 'transparent';
+  minimizeBtn.style.color = 'rgb(0, 204, 0)';
+  minimizeBtn.style.borderWidth = '0px 0px 0px 1px';
+  minimizeBtn.style.border = 'solid rbg(68, 68, 68)';
+  minimizeBtn.style.width = '24px';
+  minimizeBtn.style.height = '24px';
+  minimizeBtn.style.display = 'flex';
+  minimizeBtn.style.alignItems = 'center';
+  minimizeBtn.style.justifyContent = 'center';
+  minimizeBtn.style.cursor = 'pointer';
+  minimizeBtn.style.fontSize = '23px';
+  minimizeBtn.style.padding = '0';
   buttonContainer.appendChild(minimizeBtn);
 
-  const minimizeBtnText = doc.createElement("span");
-  minimizeBtnText.id = "contract-minimize-btn-text";
+  const minimizeBtnText = doc.createElement('span');
+  minimizeBtnText.id = 'contract-minimize-btn-text';
   minimizeBtnText.innerText = '⌄';
-  minimizeBtnText.style.width = "24px";
-  minimizeBtnText.style.height = "24px";
+  minimizeBtnText.style.width = '24px';
+  minimizeBtnText.style.height = '24px';
   minimizeBtn.appendChild(minimizeBtnText);
 
   // Close button
-  const closeBtn = doc.createElement("button");
-  closeBtn.innerText = "✕";
-  closeBtn.style.backgroundColor = "transparent";
-  closeBtn.style.color = "rgb(0, 204, 0)";
-  closeBtn.style.borderWidth = "0px 0px 0px 1px";
-  closeBtn.style.border = "solid rbg(68, 68, 68)";
-  closeBtn.style.width = "24px";
-  closeBtn.style.height = "24px";
-  closeBtn.style.display = "flex";
-  closeBtn.style.alignItems = "center";
-  closeBtn.style.justifyContent = "center";
-  closeBtn.style.cursor = "pointer";
-  closeBtn.style.fontSize = "23px";
-  closeBtn.style.padding = "0";
-  closeBtn.onclick = () => { ns.exit() };
+  const closeBtn = doc.createElement('button');
+  closeBtn.innerText = '✕';
+  closeBtn.style.backgroundColor = 'transparent';
+  closeBtn.style.color = 'rgb(0, 204, 0)';
+  closeBtn.style.borderWidth = '0px 0px 0px 1px';
+  closeBtn.style.border = 'solid rbg(68, 68, 68)';
+  closeBtn.style.width = '24px';
+  closeBtn.style.height = '24px';
+  closeBtn.style.display = 'flex';
+  closeBtn.style.alignItems = 'center';
+  closeBtn.style.justifyContent = 'center';
+  closeBtn.style.cursor = 'pointer';
+  closeBtn.style.fontSize = '23px';
+  closeBtn.style.padding = '0';
+  closeBtn.onclick = () => {
+    ns.exit();
+  };
   buttonContainer.appendChild(closeBtn);
 
   // Create content wrapper (will be hidden when minimized)
-  const contentWrapper = doc.createElement("div");
-  contentWrapper.id = "contract-content-wrapper";
+  const contentWrapper = doc.createElement('div');
+  contentWrapper.id = 'contract-content-wrapper';
   contentWrapper.style.display = 'none';
-  contentWrapper.style.border = "1px solid rgb(68, 68, 68)";
-  contentWrapper.style.borderTop = "none";
-  contentWrapper.style.overflow = "hidden"; // Added to prevent overall scrolling
-  contentWrapper.style.maxHeight = "calc(100vh - 100px)"; // Set max height
-  contentWrapper.style.position = "relative"; // Added for resize handle positioning
+  contentWrapper.style.border = '1px solid rgb(68, 68, 68)';
+  contentWrapper.style.borderTop = 'none';
+  contentWrapper.style.overflow = 'hidden'; // Added to prevent overall scrolling
+  contentWrapper.style.maxHeight = 'calc(100vh - 100px)'; // Set max height
+  contentWrapper.style.position = 'relative'; // Added for resize handle positioning
   contractUI.appendChild(contentWrapper);
 
   // Create content container
-  const content = doc.createElement("div");
-  content.id = "contract-content";
-  content.style.display = "flex";
-  content.style.flexGrow = "1";
-  content.style.overflow = "hidden";
-  content.style.height = "calc(100vh - 100px - 33px)"; // Fixed height (viewport - margins - header)
+  const content = doc.createElement('div');
+  content.id = 'contract-content';
+  content.style.display = 'flex';
+  content.style.flexGrow = '1';
+  content.style.overflow = 'hidden';
+  content.style.height = 'calc(100vh - 100px - 33px)'; // Fixed height (viewport - margins - header)
   contentWrapper.appendChild(content);
 
   // Create list view
-  const listView = doc.createElement("div");
-  listView.id = "contract-list";
-  listView.style.width = "40%";
-  listView.style.maxWidth = "25rem";
-  listView.style.overflowY = "auto"; // This stays as auto to allow scrolling
-  listView.style.backgroundColor = "#001100";
-  listView.style.padding = "5px";
-  listView.style.maxHeight = "calc(100vh - 150px)"; // Set max height to ensure scrolling works
+  const listView = doc.createElement('div');
+  listView.id = 'contract-list';
+  listView.style.width = '40%';
+  listView.style.maxWidth = '25rem';
+  listView.style.overflowY = 'auto'; // This stays as auto to allow scrolling
+  listView.style.backgroundColor = '#001100';
+  listView.style.padding = '5px';
+  listView.style.maxHeight = 'calc(100vh - 150px)'; // Set max height to ensure scrolling works
   content.appendChild(listView);
 
   // Create detail view
-  const detailView = doc.createElement("div");
-  detailView.id = "contract-detail";
-  detailView.style.width = "100%";
-  detailView.style.overflow = "auto"; // This can also be scrollable
-  detailView.style.backgroundColor = "#001100";
-  detailView.style.padding = "10px";
-  detailView.style.maxHeight = "calc(100vh - 150px)"; // Set max height to ensure scrolling works
+  const detailView = doc.createElement('div');
+  detailView.id = 'contract-detail';
+  detailView.style.width = '100%';
+  detailView.style.overflow = 'auto'; // This can also be scrollable
+  detailView.style.backgroundColor = '#001100';
+  detailView.style.padding = '10px';
+  detailView.style.maxHeight = 'calc(100vh - 150px)'; // Set max height to ensure scrolling works
   content.appendChild(detailView);
 
   // Create resize handle (crab handle)
-  const resizeHandle = doc.createElement("div");
-  resizeHandle.id = "contract-resize-handle";
-  resizeHandle.style.position = "absolute";
-  resizeHandle.style.bottom = "0";
-  resizeHandle.style.right = "0";
-  resizeHandle.style.width = "15px";
-  resizeHandle.style.height = "15px";
-  resizeHandle.style.cursor = "nwse-resize";
-  resizeHandle.style.zIndex = "10000";
-  resizeHandle.innerHTML = "⊿"; // Triangle symbol for resize handle
-  resizeHandle.style.color = "rgb(0, 204, 0)";
-  resizeHandle.style.fontSize = "15px";
-  resizeHandle.style.lineHeight = "15px";
-  resizeHandle.style.textAlign = "center";
-  resizeHandle.style.transform = "rotate(-45deg)"; // Rotate to point bottom-right
+  const resizeHandle = doc.createElement('div');
+  resizeHandle.id = 'contract-resize-handle';
+  resizeHandle.style.position = 'absolute';
+  resizeHandle.style.bottom = '0';
+  resizeHandle.style.right = '0';
+  resizeHandle.style.width = '15px';
+  resizeHandle.style.height = '15px';
+  resizeHandle.style.cursor = 'nwse-resize';
+  resizeHandle.style.zIndex = '10000';
+  resizeHandle.innerHTML = '⊿'; // Triangle symbol for resize handle
+  resizeHandle.style.color = 'rgb(0, 204, 0)';
+  resizeHandle.style.fontSize = '15px';
+  resizeHandle.style.lineHeight = '15px';
+  resizeHandle.style.textAlign = 'center';
+  resizeHandle.style.transform = 'rotate(-45deg)'; // Rotate to point bottom-right
   contentWrapper.appendChild(resizeHandle);
 
   // Add UI to document
@@ -188,7 +191,7 @@ export async function main(ns) {
   let currentSelection = {
     server: null,
     filename: null,
-    index: -1
+    index: -1,
   };
 
   // Function to toggle minimized state
@@ -246,11 +249,13 @@ export async function main(ns) {
       const newHeight = startHeight + (e.clientY - startY);
 
       // Apply the new size with minimum constraints
-      if (newWidth > 200) { // Minimum width
+      if (newWidth > 200) {
+        // Minimum width
         element.style.width = newWidth + 'px';
       }
 
-      if (newHeight > 100) { // Minimum height
+      if (newHeight > 100) {
+        // Minimum height
         contentElement.style.height = newHeight + 'px';
 
         // Update the list and detail view heights
@@ -258,8 +263,8 @@ export async function main(ns) {
         const detailView = doc.getElementById('contract-detail');
 
         if (listView && detailView) {
-          listView.style.maxHeight = (newHeight - 10) + 'px'; // Subtract padding
-          detailView.style.maxHeight = (newHeight - 10) + 'px'; // Subtract padding
+          listView.style.maxHeight = newHeight - 10 + 'px'; // Subtract padding
+          detailView.style.maxHeight = newHeight - 10 + 'px'; // Subtract padding
         }
       }
     }
@@ -295,9 +300,12 @@ export async function main(ns) {
 
   // Make element draggable
   function makeElementDraggable(element, dragHandle) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    let pos1 = 0,
+      pos2 = 0,
+      pos3 = 0,
+      pos4 = 0;
 
-    dragHandle.style.cursor = "move";
+    dragHandle.style.cursor = 'move';
 
     dragHandle.onmousedown = dragMouseDown;
 
@@ -321,9 +329,9 @@ export async function main(ns) {
       pos3 = e.clientX;
       pos4 = e.clientY;
       // Set element's new position
-      element.style.top = (element.offsetTop - pos2) + "px";
-      element.style.left = (element.offsetLeft - pos1) + "px";
-      element.style.right = "auto";
+      element.style.top = element.offsetTop - pos2 + 'px';
+      element.style.left = element.offsetLeft - pos1 + 'px';
+      element.style.right = 'auto';
     }
 
     function closeDragElement() {
@@ -337,7 +345,7 @@ export async function main(ns) {
   function copyToClipboard(text) {
     const textarea = document.createElement('textarea');
     textarea.value = text;
-    textarea.style.position = 'fixed';  // Prevent scrolling to bottom
+    textarea.style.position = 'fixed'; // Prevent scrolling to bottom
     document.body.appendChild(textarea);
     textarea.select();
 
@@ -367,15 +375,15 @@ export async function main(ns) {
 
   // Function to find contract index by server and filename
   function findContractIndex(contracts, server, filename) {
-    return contracts.findIndex(c =>
-      c.server === server && c.filename === filename
+    return contracts.findIndex(
+      (c) => c.server === server && c.filename === filename
     );
   }
 
   // Function to find contract index by server and filename
   function findContractIndex(contracts, server, filename) {
-    return contracts.findIndex(c =>
-      c.server === server && c.filename === filename
+    return contracts.findIndex(
+      (c) => c.server === server && c.filename === filename
     );
   }
 
@@ -388,14 +396,17 @@ export async function main(ns) {
     const listView = doc.getElementById('contract-list');
     const detailView = doc.getElementById('contract-detail');
 
-    if (!listView || !detailView) { return }
+    if (!listView || !detailView) {
+      return;
+    }
 
     // Clear list view
     listView.innerHTML = '';
 
     // Populate list view
     if (contracts.length === 0) {
-      listView.innerHTML = '<div style="color: yellow;">No contracts found</div>';
+      listView.innerHTML =
+        '<div style="color: yellow;">No contracts found</div>';
       // Reset selection if no contracts available
       currentSelection = { server: null, filename: null, index: -1 };
     } else {
@@ -403,7 +414,8 @@ export async function main(ns) {
         const item = doc.createElement('div');
         item.style.padding = '5px';
         item.style.marginBottom = '5px';
-        item.style.backgroundColor = index === selectedIndex ? '#003300' : '#001100';
+        item.style.backgroundColor =
+          index === selectedIndex ? '#003300' : '#001100';
         item.style.border = '1px solid #003300';
         item.style.cursor = 'pointer';
 
@@ -419,8 +431,15 @@ export async function main(ns) {
         item.onclick = () => {
           // Save any input from the current selection before switching
           const currentInput = doc.getElementById('solution-input');
-          if (currentInput && currentSelection.server && currentSelection.filename) {
-            const currentKey = getContractKey(currentSelection.server, currentSelection.filename);
+          if (
+            currentInput &&
+            currentSelection.server &&
+            currentSelection.filename
+          ) {
+            const currentKey = getContractKey(
+              currentSelection.server,
+              currentSelection.filename
+            );
             solutionInputs.set(currentKey, currentInput.value);
           }
 
@@ -428,7 +447,7 @@ export async function main(ns) {
           currentSelection = {
             server: contract.server,
             filename: contract.filename,
-            index: index
+            index: index,
           };
           updateUI(contracts, index);
         };
@@ -525,14 +544,14 @@ export async function main(ns) {
           const descText = contract.description;
           const success = copyToClipboard(descText);
           if (success) {
-            copyDescBtn.innerText = "Copied!";
+            copyDescBtn.innerText = 'Copied!';
             setTimeout(() => {
-              copyDescBtn.innerText = "Copy to Clipboard";
+              copyDescBtn.innerText = 'Copy to Clipboard';
             }, 2000);
           } else {
-            copyDescBtn.innerText = "Failed to copy";
+            copyDescBtn.innerText = 'Failed to copy';
             setTimeout(() => {
-              copyDescBtn.innerText = "Copy to Clipboard";
+              copyDescBtn.innerText = 'Copy to Clipboard';
             }, 2000);
           }
         };
@@ -542,27 +561,32 @@ export async function main(ns) {
       if (submitSolutionBtn) {
         submitSolutionBtn.onclick = () => {
           const solutionInput = doc.getElementById('solution-input');
-          if (solutionInput && solutionInput.value.trim() !== "") {
+          if (solutionInput && solutionInput.value.trim() !== '') {
             // Get the solution value
             const solution = solutionInput.value.trim();
 
             // Attempt to submit the solution
             try {
-              const result = ns.codingcontract.attempt(solution, contract.filename, contract.server, { returnReward: true });
+              const result = ns.codingcontract.attempt(
+                solution,
+                contract.filename,
+                contract.server,
+                { returnReward: true }
+              );
 
               if (result) {
                 // Success, show the reward
                 ns.alert(`Success! Reward: ${result}`);
 
                 // Clear the input field and saved value
-                solutionInput.value = "";
+                solutionInput.value = '';
                 solutionInputs.delete(contractKey);
 
                 // Refresh the contracts data
                 refreshContractData();
               } else {
                 // Failure
-                ns.alert("Incorrect solution. Try again!");
+                ns.alert('Incorrect solution. Try again!');
 
                 // Save the current input before refreshing
                 solutionInputs.set(contractKey, solutionInput.value);
@@ -575,26 +599,32 @@ export async function main(ns) {
               ns.alert(`Error submitting solution: ${error}`);
             }
           } else {
-            ns.alert("Please enter a solution before submitting.");
+            ns.alert('Please enter a solution before submitting.');
           }
         };
       }
     } else {
-      detailView.innerHTML = '<div style="color: gray; font-style: italic;">Select a contract to view details</div>';
+      detailView.innerHTML =
+        '<div style="color: gray; font-style: italic;">Select a contract to view details</div>';
     }
   }
 
   // Function to refresh contract data
   async function refreshContractData() {
     const status = doc.getElementById('contract-status');
-    if (!status) { return };
+    if (!status) {
+      return;
+    }
 
-    status.innerText = "Scanning network for contracts...";
+    status.innerText = 'Scanning network for contracts...';
 
     // Save the current input value before refreshing
     const currentInput = doc.getElementById('solution-input');
     if (currentInput && currentSelection.server && currentSelection.filename) {
-      const currentKey = getContractKey(currentSelection.server, currentSelection.filename);
+      const currentKey = getContractKey(
+        currentSelection.server,
+        currentSelection.filename
+      );
       solutionInputs.set(currentKey, currentInput.value);
     }
 
@@ -603,13 +633,19 @@ export async function main(ns) {
 
     // Find all contracts
     for (const server of servers) {
-      const contracts = ns.ls(server, ".cct");
+      const contracts = ns.ls(server, '.cct');
 
       if (contracts.length > 0) {
         for (const contract of contracts) {
           const type = ns.codingcontract.getContractType(contract, server);
-          const description = ns.codingcontract.getDescription(contract, server);
-          const tries = ns.codingcontract.getNumTriesRemaining(contract, server);
+          const description = ns.codingcontract.getDescription(
+            contract,
+            server
+          );
+          const tries = ns.codingcontract.getNumTriesRemaining(
+            contract,
+            server
+          );
 
           contractData.push({
             server,
@@ -634,7 +670,11 @@ export async function main(ns) {
     }
 
     // If we couldn't find the exact contract, keep the current index if valid
-    if (newSelectedIndex === -1 && currentSelection.index >= 0 && currentSelection.index < contractData.length) {
+    if (
+      newSelectedIndex === -1 &&
+      currentSelection.index >= 0 &&
+      currentSelection.index < contractData.length
+    ) {
       newSelectedIndex = currentSelection.index;
     }
 
@@ -655,9 +695,9 @@ export async function main(ns) {
   // Initial data load
   await refreshContractData();
 
-  ns.atExit(() => contractUI.remove())
+  ns.atExit(() => contractUI.remove());
 
-  toggleMinimize()
+  toggleMinimize();
 
   // Main loop
   while (true) {
@@ -666,3 +706,4 @@ export async function main(ns) {
     await refreshContractData();
   }
 }
+

@@ -15,7 +15,12 @@ function findThreatMove(ns, board, validMoves, liberties) {
       // Check if this is an opponent's piece with exactly 2 liberties
       if (board[x][y] === 'O' && liberties[x][y] === 2) {
         // Find one of the liberty positions by checking adjacent points
-        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        const directions = [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ];
 
         for (const [dx, dy] of directions) {
           const nx = x + dx;
@@ -58,7 +63,12 @@ function findExpansionMove(ns, board, validMoves) {
     for (let y = 0; y < size; y++) {
       if (validMoves[x][y]) {
         // Check if this move is adjacent to our existing stones
-        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        const directions = [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ];
         let adjacentToOurs = false;
         let emptyNeighbors = 0;
 
@@ -98,7 +108,12 @@ function findExpansionMove(ns, board, validMoves) {
  */
 function endangersOurChains(board, liberties, x, y) {
   const size = board.length;
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const directions = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
 
   // Check if this move would reduce any of our chains to 1 liberty
   for (const [dx, dy] of directions) {
@@ -116,7 +131,7 @@ function endangersOurChains(board, liberties, x, y) {
   }
 
   return false;
-}/**
+} /**
  * Check if there are potential captures that we should pursue
  * @param {NS} ns - Netscript interface
  * @param {string[]} board - Current board state
@@ -138,19 +153,19 @@ function hasPotentialCaptures(ns, board, validMoves, liberties) {
   }
 
   return false;
-}/** @param {NS} ns */
+} /** @param {NS} ns */
 export async function main(ns) {
   // Disable logs and clear terminal
-  ns.disableLog("ALL");
+  ns.disableLog('ALL');
   ns.clearLog();
-  ns.print("Lightweight IPvGO MCTS Bot Starting...");
+  ns.print('Lightweight IPvGO MCTS Bot Starting...');
 
   // Config - adjust these parameters to balance performance vs effectiveness
   const config = {
-    simulations: 50,     // Number of simulations per move (lower = faster, higher = better)
-    searchDepth: 5,      // Max steps in each simulation (lower = faster)
-    explorationWeight: 1.5,  // UCB exploration parameter
-    sleepBetweenSims: 5,  // Sleep time (ms) between simulations to prevent freezing
+    simulations: 50, // Number of simulations per move (lower = faster, higher = better)
+    searchDepth: 5, // Max steps in each simulation (lower = faster)
+    explorationWeight: 1.5, // UCB exploration parameter
+    sleepBetweenSims: 5, // Sleep time (ms) between simulations to prevent freezing
   };
 
   ns.print(`Config: ${JSON.stringify(config)}`);
@@ -158,8 +173,8 @@ export async function main(ns) {
   // Keep playing games continuously
   while (true) {
     // Reset the board for a new game against Netburners with 7x7 grid
-    await ns.go.resetBoardState("Netburners", 7);
-    ns.print("Starting new game against Netburners on 7x7 grid");
+    await ns.go.resetBoardState('Netburners', 7);
+    ns.print('Starting new game against Netburners on 7x7 grid');
 
     // Play the current game until completion
     await playGame(ns, config);
@@ -209,17 +224,19 @@ async function playGame(ns, config) {
     // Check if we should pass based on area scoring principles
     const shouldPass =
       // Only pass if opponent passed AND we've maximized our position
-      (opponentPassed && (
-        // We have a significant score lead and no obvious captures remain
-        (stats.playerScore > stats.aiScore + 3 && !hasPotentialCaptures(ns, board, validMoves, liberties)) ||
+      opponentPassed &&
+      // We have a significant score lead and no obvious captures remain
+      ((stats.playerScore > stats.aiScore + 3 &&
+        !hasPotentialCaptures(ns, board, validMoves, liberties)) ||
         // Opponent has no pins left (complete victory)
         opponentPinCount === 0 ||
         // Very late game with substantial advantage
-        (boardCoverage > 0.9 && playerPinCount > opponentPinCount * 2)
-      ));
+        (boardCoverage > 0.9 && playerPinCount > opponentPinCount * 2));
 
     if (shouldPass) {
-      ns.print(`Passing to secure win - Player: ${stats.playerScore}, Opponent: ${stats.aiScore}, Coverage: ${Math.round(boardCoverage * 100)}%`);
+      ns.print(
+        `Passing to secure win - Player: ${stats.playerScore}, Opponent: ${stats.aiScore}, Coverage: ${Math.round(boardCoverage * 100)}%`
+      );
       result = await ns.go.passTurn();
     } else {
       // Find best move using simplified MCTS
@@ -230,21 +247,21 @@ async function playGame(ns, config) {
         ns.print(`Playing move at [${move.x}, ${move.y}]`);
         result = await ns.go.makeMove(move.x, move.y);
       } else {
-        ns.print("Passing turn - no good moves available");
+        ns.print('Passing turn - no good moves available');
         result = await ns.go.passTurn();
       }
     }
 
     // Track if opponent passed
-    opponentPassed = (result.type === "pass");
+    opponentPassed = result.type === 'pass';
 
     // Log opponent's response
-    if (result.type === "move") {
+    if (result.type === 'move') {
       ns.print(`Opponent played at [${result.x}, ${result.y}]`);
-    } else if (result.type === "pass") {
-      ns.print("Opponent passed their turn");
-    } else if (result.type === "gameOver") {
-      ns.print("Game over!");
+    } else if (result.type === 'pass') {
+      ns.print('Opponent passed their turn');
+    } else if (result.type === 'gameOver') {
+      ns.print('Game over!');
     }
 
     // Wait for opponent's next turn
@@ -252,12 +269,13 @@ async function playGame(ns, config) {
 
     // Add a small delay between moves
     await ns.sleep(200);
-
-  } while (result?.type !== "gameOver");
+  } while (result?.type !== 'gameOver');
 
   // Game stats
   const stats = ns.go.analysis.getStats();
-  ns.print(`Game finished! Score - You: ${stats.playerScore}, Opponent: ${stats.aiScore}`);
+  ns.print(
+    `Game finished! Score - You: ${stats.playerScore}, Opponent: ${stats.aiScore}`
+  );
   return stats;
 }
 
@@ -276,14 +294,14 @@ async function findBestMove(ns, board, validMoves, liberties, config) {
   // 1. Check if we can capture an opponent's chain
   const captureMove = findCaptureMove(ns, board, validMoves, liberties);
   if (captureMove) {
-    ns.print("Found capture move!");
+    ns.print('Found capture move!');
     return captureMove;
   }
 
   // 2. Check if we need to defend one of our chains
   const defendMove = findDefendMove(ns, board, validMoves, liberties);
   if (defendMove) {
-    ns.print("Found defensive move!");
+    ns.print('Found defensive move!');
     return defendMove;
   }
 
@@ -297,7 +315,7 @@ async function findBestMove(ns, board, validMoves, liberties, config) {
   // 4. Check for territory expansion
   const expansionMove = findExpansionMove(ns, board, validMoves);
   if (expansionMove) {
-    ns.print("Found territory expansion move!");
+    ns.print('Found territory expansion move!');
     return expansionMove;
   }
 
@@ -398,7 +416,8 @@ function selectMoveUCB(moves, moveStats, explorationWeight, simulationNum) {
       ucb = Infinity; // Ensure unvisited nodes are tried
     } else {
       const exploitation = stats.wins / stats.visits;
-      const exploration = explorationWeight * Math.sqrt(Math.log(totalVisits) / stats.visits);
+      const exploration =
+        explorationWeight * Math.sqrt(Math.log(totalVisits) / stats.visits);
       ucb = exploitation + exploration;
     }
 
@@ -428,7 +447,12 @@ function findCaptureMove(ns, board, validMoves, liberties) {
       // Check if this is an opponent's piece with exactly 1 liberty
       if (board[x][y] === 'O' && liberties[x][y] === 1) {
         // Find the liberty position by checking adjacent points
-        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        const directions = [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ];
 
         for (const [dx, dy] of directions) {
           const nx = x + dx;
@@ -466,7 +490,12 @@ function findDefendMove(ns, board, validMoves, liberties) {
       // Check if this is our piece with exactly 1 liberty
       if (board[x][y] === 'X' && liberties[x][y] === 1) {
         // Find the liberty position by checking adjacent points
-        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        const directions = [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ];
 
         for (const [dx, dy] of directions) {
           const nx = x + dx;
@@ -522,7 +551,12 @@ async function simulateGame(ns, board, firstMove, maxDepth) {
   }
 
   // Prefer moves that have multiple empty neighbors (more liberties)
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const directions = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
   let emptyNeighbors = 0;
 
   for (const [dx, dy] of directions) {
@@ -556,7 +590,12 @@ async function simulateGame(ns, board, firstMove, maxDepth) {
  */
 function reducesOpponentLiberties(board, x, y) {
   const size = board.length;
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const directions = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
 
   for (const [dx, dy] of directions) {
     const nx = x + dx;
@@ -582,7 +621,12 @@ function reducesOpponentLiberties(board, x, y) {
  */
 function isCapturingMove(board, x, y) {
   const size = board.length;
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const directions = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
 
   // Check each adjacent point
   for (const [dx, dy] of directions) {
@@ -625,7 +669,12 @@ function increasesLiberties(board, x, y) {
  */
 function isExpandingMove(board, x, y) {
   const size = board.length;
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const directions = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
 
   // Check each adjacent point
   for (const [dx, dy] of directions) {
@@ -643,3 +692,4 @@ function isExpandingMove(board, x, y) {
 
   return false;
 }
+

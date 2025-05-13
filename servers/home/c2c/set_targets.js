@@ -1,4 +1,4 @@
-import { TARGET_PORT } from "/helpers/ports.js"
+import { TARGET_PORT } from '../helpers/ports.js';
 
 /**
  * @param {AutocompleteData} data - context about the game, useful when autocompleting
@@ -12,12 +12,11 @@ export function autocomplete(data, args) {
   const lastComplete = servers.includes(args.at(-1));
 
   if (args.at(-1) && !lastComplete) {
-    return newServers.filter((server) => server.startsWith(args.at(-1)))
+    return newServers.filter((server) => server.startsWith(args.at(-1)));
   }
 
   return newServers;
 }
-
 
 /** @param {NS} ns */
 function enum_target(ns, server) {
@@ -33,13 +32,13 @@ function enum_target(ns, server) {
     },
     growth: ns.getServerGrowth(server),
     time: ns.getHackTime(server),
-    chance: ns.hackAnalyzeChance(server)
-  }
+    chance: ns.hackAnalyzeChance(server),
+  };
 }
 
 /** @param {NS} ns */
 function find_targets(ns, servers) {
-  const analyzed_servers = servers.map(server => {
+  const analyzed_servers = servers.map((server) => {
     const data = enum_target(ns, server);
 
     const score = 1;
@@ -56,12 +55,12 @@ function find_targets(ns, servers) {
 
 /** @param {NS} ns */
 export async function main(ns) {
-  const args = ns.flags([["help", false]]);
+  const args = ns.flags([['help', false]]);
 
   if (args.help || args._.length < 1) {
-    ns.tprint("Target the botnet on one specific targets.");
+    ns.tprint('Target the botnet on one specific targets.');
     ns.tprint(`Usage: run ${ns.getScriptName()} TARGET1 TARGET2`);
-    ns.tprint("Example:");
+    ns.tprint('Example:');
     ns.tprint(`> run ${ns.getScriptName()} foodnstuff n00dles`);
     return;
   }
@@ -70,11 +69,11 @@ export async function main(ns) {
 
   const targets = find_targets(ns, servers);
 
-  const target_names = targets.map(target => target.hostname);
-  const target_string = target_names.join(", ")
+  const target_names = targets.map((target) => target.hostname);
+  const target_string = target_names.join(', ');
 
-  ns.print("Sending " + target_string + " to port " + TARGET_PORT)
-  ns.toast("Setting new targets\n" + target_string)
+  ns.print('Sending ' + target_string + ' to port ' + TARGET_PORT);
+  ns.toast('Setting new targets\n' + target_string);
 
   ns.clearPort(TARGET_PORT);
   ns.writePort(TARGET_PORT, JSON.stringify(targets));

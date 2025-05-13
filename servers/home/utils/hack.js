@@ -1,15 +1,15 @@
-const TARGET_PORT = 9000
+import { TARGET_PORT } from '../helpers/ports.js';
 
 /** @param {NS} ns */
 async function run_on_target(ns, target, type) {
   switch (type) {
-    case "grow":
+    case 'grow':
       await ns.grow(target);
       return;
-    case "weaken":
+    case 'weaken':
       await ns.weaken(target);
       return;
-    case "hack":
+    case 'hack':
       await ns.hack(target);
       return;
     default:
@@ -28,23 +28,23 @@ export async function main(ns) {
   while (true) {
     const target_port_data = ns.peek(TARGET_PORT);
 
-    if (target_port_data != "" && target_port_data !== "NULL PORT DATA") {
+    if (target_port_data != '' && target_port_data !== 'NULL PORT DATA') {
       const new_targets = JSON.parse(target_port_data);
-      const target_names = new_targets.map(t => t.hostname).sort();
+      const target_names = new_targets.map((t) => t.hostname).sort();
 
       if (target_names !== targets) {
         targets = target_names;
-        ns.print("hack: Set targets to " + target_names.join(", "))
+        ns.print('hack: Set targets to ' + target_names.join(', '));
       }
     }
 
     if (!targets) {
       ns.sleep(1000 * 2);
-      break
+      break;
     }
 
-    const stage = i <= growEnd ? "grow" : "weaken";
-    ns.print("Stage " + stage + " i=" + i)
+    const stage = i <= growEnd ? 'grow' : 'weaken';
+    ns.print('Stage ' + stage + ' i=' + i);
 
     for (let t = 0; t < targets.length; t++) {
       await run_on_target(ns, targets[t], stage);
@@ -53,7 +53,7 @@ export async function main(ns) {
       const curr_money = ns.getServerMoneyAvailable(targets[t]);
 
       if (curr_money / max_money > 0.95) {
-        await run_on_target(ns, targets[t], "hack");
+        await run_on_target(ns, targets[t], 'hack');
       }
     }
 
