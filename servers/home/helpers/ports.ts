@@ -3,9 +3,12 @@ export const GOAL_PORT = 9001;
 export const TARGET_PORT = 9002;
 export const HOME_RESERVE_PORT = 9003;
 
+export const ENUM_PID_PORT = 8000;
+
 export const ALL_PORTS = [
   STATE_PORT,
   GOAL_PORT,
   TARGET_PORT,
   HOME_RESERVE_PORT,
+  ENUM_PID_PORT,
 ];
