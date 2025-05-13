@@ -1,9 +1,4 @@
-import {
-  disable_logs,
-  formatCurrency,
-  formatNumber,
-  notify,
-} from '../helpers/cli.js';
+import { disable_logs, formatCurrency, notify } from '../helpers/cli.js';
 
 const OPERATION_COST = 100000; // do not change this is fixed in the game
 
@@ -65,16 +60,21 @@ function getOwnedSymbols(tix: TIX): OwnedSymbol[] {
   return symbols;
 }
 
-function serversMaxxed(ns: NS): boolean {
+// Start trading when upgrading all servers takes more than KEEP_MONEY_ON_HOME_MILLION
+function areServersMaxxed(ns: NS): boolean {
   const servers = ns.getPurchasedServers();
   const maxCount = ns.getPurchasedServerLimit();
 
   if (servers.length < maxCount) return false;
 
   const maxRAM = ns.getPurchasedServerMaxRam();
+  const costThreshold = (KEEP_MONEY_ON_HOME_MILLION * 1000000) / maxCount;
 
   for (let i in servers) {
-    if (ns.getServerMaxRam(servers[i]) < maxRAM) {
+    const currRam = ns.getServerMaxRam(servers[i]);
+    const nextCost = ns.getPurchasedServerUpgradeCost(servers[i], currRam * 2);
+
+    if (currRam < maxRAM && nextCost < costThreshold) {
       return false;
     }
   }
@@ -82,18 +82,55 @@ function serversMaxxed(ns: NS): boolean {
   return true;
 }
 
+function checkRequirements(ns: NS, tix: TIX): boolean {
+  if (!areServersMaxxed(ns)) {
+    notify(ns, 'Waiting for max servers');
+    return false;
+  }
+
+  if (!tix.purchaseWseAccount()) {
+    notify(ns, 'Waiting for money to buy WSE account');
+    return false;
+  }
+
+  if (!tix.purchase4SMarketData()) {
+    notify(ns, 'Waiting for money to buy 4S data');
+    return false;
+  }
+
+  if (!tix.purchaseTixApi()) {
+    notify(ns, 'Waiting for money to buy TIX API');
+    return false;
+  }
+
+  if (!tix.purchase4SMarketDataTixApi()) {
+    notify(ns, 'Waiting for money to buy 4S API');
+    return false;
+  }
+
+  return true;
+}
+
 export async function main(ns: NS) {
   disable_logs(ns, [
+    'getServerMaxRam',
     'getServerMoneyAvailable',
     'sleep',
     'stock.sellStock',
     'stock.buyStock',
+    'stock.purchaseWseAccount',
+    'stock.purchase4SMarketData',
+    'stock.purchaseTixApi',
+    'stock.purchase4SMarketDataTixApi',
   ]);
+  notify(ns, 'TRADING BOT STARTED');
+
   const tix = ns.stock;
+  let requirementsFilled = checkRequirements(ns, tix);
 
   while (true) {
-    if (!serversMaxxed(ns)) {
-      notify(ns, 'Waiting for max servers');
+    if (!requirementsFilled) {
+      requirementsFilled = checkRequirements(ns, tix);
       await ns.sleep(1000 * 60 * 2);
       continue;
     }
@@ -111,7 +148,7 @@ export async function main(ns: NS) {
         if (sellPrice > 0) {
           notify(
             ns,
-            `Sell ${formatNumber(ns, shares)} x ${sym} for ${formatCurrency(ns, sellPrice * shares)}.`,
+            `Sell ${ns.formatNumber(shares)} x ${sym} for ${formatCurrency(ns, sellPrice * shares)}.`,
             'trade'
           );
         }
@@ -143,7 +180,7 @@ export async function main(ns: NS) {
             if (purchasePrice > 0) {
               notify(
                 ns,
-                `Buy ${formatNumber(ns, amountToAfford)} x ${sym} for ${formatCurrency(ns, purchasePrice * amountToAfford)}.`,
+                `Buy ${ns.formatNumber(amountToAfford)} x ${sym} for ${formatCurrency(ns, purchasePrice * amountToAfford)}.`,
                 'trade'
               );
             }
