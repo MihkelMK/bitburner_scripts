@@ -2,9 +2,8 @@ import {
   C2CState,
   CommandConfig,
   Commands,
-  OptimizationResult,
   ServerAllocation,
-  TargetData,
+  Target,
   TaskAllocation,
 } from '../types/c2c';
 
@@ -14,7 +13,7 @@ import {
   TARGET_PORT,
   HOME_RESERVE_PORT,
 } from '../helpers/ports';
-import { disable_logs, notify, formatNumber } from '../helpers/cli';
+import { disable_logs, notify, inform } from '../helpers/cli';
 
 const IGNORE = ['darkweb'];
 
@@ -52,6 +51,108 @@ const COMMANDS: Commands = {
 //   share: { src: "share_ram.js", targeted: false }
 // }
 
+const BASE_ALLOCATION = {
+  grow: 0,
+  weaken: 0,
+  hack: 0,
+  ddos: 0,
+};
+
+const BASE_C2C_STATE = {
+  allocations: {},
+  hack: [],
+  grow: [],
+  weaken: [],
+  ddos: [],
+  share: [],
+  goal: undefined,
+  targets: [],
+  reserved_on_home: 0,
+};
+
+// Helper function to pad strings to specified width
+function padStringLeft(str: string, width: number) {
+  return str.toString().padEnd(width);
+}
+
+// Helper function to right-align string to specified width
+function padStringRight(str: string, width: number) {
+  return str.toString().padStart(width);
+}
+
+// Helper function to right-align string to specified width
+function padStringCenter(str: string, width: number) {
+  const text = str.toString();
+  const textWidth = text.length;
+
+  const totalPadding = width - textWidth;
+  const halfPadded = textWidth + totalPadding / 2;
+
+  return str.toString().padStart(halfPadded).padEnd(width);
+}
+
+// Helper function to update column width based on content
+function updateColumnWidth(
+  columnWidths: Record<string, number>,
+  column: keyof typeof columnWidths,
+  content: string | number
+) {
+  const contentLength = content.toString().length;
+  if (contentLength > columnWidths[column]) {
+    columnWidths[column] = contentLength;
+  }
+}
+
+function printC2CAssign(ns: NS, data: ServerAllocation[], title: string) {
+  const targetsWithThreads = data.filter(
+    ({ tasks }) => tasks.grow > 0 || tasks.weaken > 0 || tasks.hack > 0
+  );
+
+  if (targetsWithThreads.length === 0) {
+    return;
+  }
+
+  const rows = [];
+  const columnWidths = {
+    hostname: 20,
+    grow: 4,
+    weaken: 4,
+    hack: 4,
+  };
+
+  targetsWithThreads.forEach(({ hostname, tasks }) => {
+    const grow = ns.formatNumber(tasks.grow, 0);
+    const weaken = ns.formatNumber(tasks.weaken, 0);
+    const hack = ns.formatNumber(tasks.hack, 0);
+
+    updateColumnWidth(columnWidths, 'hostname', hostname);
+    updateColumnWidth(columnWidths, 'grow', grow);
+    updateColumnWidth(columnWidths, 'weaken', weaken);
+    updateColumnWidth(columnWidths, 'hack', hack);
+
+    rows.push({
+      hostname,
+      grow,
+      weaken,
+      hack,
+    });
+  });
+
+  const header = `${padStringRight('grow', columnWidths.grow)} | ${padStringRight('weak', columnWidths.weaken)} | ${padStringRight('hack', columnWidths.hack)} | target`;
+  const separator = `${'-'.repeat(columnWidths.grow)} | ${'-'.repeat(columnWidths.weaken)} | ${'-'.repeat(columnWidths.hack)} | ------`;
+
+  notify(ns, title);
+  inform(ns, header);
+  inform(ns, separator);
+
+  rows.forEach((row) => {
+    inform(
+      ns,
+      `${padStringRight(row.grow, columnWidths.grow)} | ${padStringRight(row.weaken, columnWidths.weaken)} | ${padStringRight(row.hack, columnWidths.hack)} | ${row.hostname}`
+    );
+  });
+}
+
 function printServerTaskStats(
   ns: NS,
   serverData: { [key: string]: ServerAllocation }
@@ -78,20 +179,9 @@ function printServerTaskStats(
     // Store cell content for all rows to calculate width and reuse when printing
     const tableRows: any[] = [];
 
-    // Helper function to update column width based on content
-    function updateColumnWidth(
-      column: keyof typeof columnWidths,
-      content: string | number
-    ) {
-      const contentLength = content.toString().length;
-      if (contentLength > columnWidths[column]) {
-        columnWidths[column] = contentLength;
-      }
-    }
-
     // Update column widths based on header text
-    updateColumnWidth('hostname', 'hostname');
-    updateColumnWidth('total', 'total');
+    updateColumnWidth(columnWidths, 'hostname', 'hostname');
+    updateColumnWidth(columnWidths, 'total', 'total');
 
     // Process each server and update column widths
     for (const hostname in serverData) {
@@ -112,22 +202,22 @@ function printServerTaskStats(
       }
 
       // Calculate percentages
-      const growPercent = ns.formatPercent((tasks.grow / totalTasks) * 100);
-      const weakenPercent = ns.formatPercent((tasks.weaken / totalTasks) * 100);
-      const hackPercent = ns.formatPercent((tasks.hack / totalTasks) * 100);
+      const growPercent = ns.formatPercent(tasks.grow / totalTasks, 1);
+      const weakenPercent = ns.formatPercent(tasks.weaken / totalTasks, 1);
+      const hackPercent = ns.formatPercent(tasks.hack / totalTasks, 1);
 
       // Format values
-      const growValue = formatNumber(ns, tasks.grow, 0);
-      const weakenValue = formatNumber(ns, tasks.weaken, 0);
-      const hackValue = formatNumber(ns, tasks.hack, 0);
-      const totalValue = formatNumber(ns, totalTasks, 0);
+      const growValue = ns.formatNumber(tasks.grow, 0);
+      const weakenValue = ns.formatNumber(tasks.weaken, 0);
+      const hackValue = ns.formatNumber(tasks.hack, 0);
+      const totalValue = ns.formatNumber(totalTasks, 0);
 
       // Update column widths based on content
-      updateColumnWidth('hostname', hostname);
-      updateColumnWidth('growValue', growValue);
-      updateColumnWidth('weakenValue', weakenValue);
-      updateColumnWidth('hackValue', hackValue);
-      updateColumnWidth('total', totalValue);
+      updateColumnWidth(columnWidths, 'hostname', hostname);
+      updateColumnWidth(columnWidths, 'growValue', growValue);
+      updateColumnWidth(columnWidths, 'weakenValue', weakenValue);
+      updateColumnWidth(columnWidths, 'hackValue', hackValue);
+      updateColumnWidth(columnWidths, 'total', totalValue);
 
       // Store row data for later printing
       tableRows.push({
@@ -142,25 +232,6 @@ function printServerTaskStats(
       });
     }
 
-    // Helper function to pad strings to specified width
-    function padStringLeft(str: string, width: number) {
-      return str.toString().padEnd(width);
-    }
-    // Helper function to right-align string to specified width
-    function padStringRight(str: string, width: number) {
-      return str.toString().padStart(width);
-    }
-    // Helper function to right-align string to specified width
-    function padStringCenter(str: string, width: number) {
-      const text = str.toString();
-      const textWidth = text.length;
-
-      const totalPadding = width - textWidth;
-      const halfPadded = textWidth + totalPadding / 2;
-
-      return str.toString().padStart(halfPadded).padEnd(width);
-    }
-
     // Calculate total column widths
     const growColWidth = columnWidths.growValue + columnWidths.percent;
     const weakenColWidth = columnWidths.weakenValue + columnWidths.percent;
@@ -170,21 +241,21 @@ function printServerTaskStats(
     const header = `| ${padStringLeft('hostname', columnWidths.hostname)} | ${padStringCenter('grow', growColWidth)} | ${padStringCenter('weaken', weakenColWidth)} | ${padStringCenter('hack', hackColWidth)} | ${padStringRight('total', columnWidths.total)} |`;
     const separator = `| ${'-'.repeat(columnWidths.hostname)} | ${'-'.repeat(growColWidth)} | ${'-'.repeat(weakenColWidth)} | ${'-'.repeat(hackColWidth)} | ${'-'.repeat(columnWidths.total)} |`;
 
-    ns.print(header);
-    ns.print(separator);
+    inform(ns, header);
+    inform(ns, separator);
 
     // Print each row with dynamic widths
     for (const row of tableRows) {
       // Format each cell with aligned percentages
-      const growText = `${padStringRight(row.growValue, columnWidths.growValue)} (${row.growPercent}%)`;
-      const weakenText = `${padStringRight(row.weakenValue, columnWidths.weakenValue)} (${row.weakenPercent}%)`;
-      const hackText = `${padStringRight(row.hackValue, columnWidths.hackValue)} (${row.hackPercent}%)`;
+      const growText = `${padStringRight(row.growValue, columnWidths.growValue)} (${row.growPercent})`;
+      const weakenText = `${padStringRight(row.weakenValue, columnWidths.weakenValue)} (${row.weakenPercent})`;
+      const hackText = `${padStringRight(row.hackValue, columnWidths.hackValue)} (${row.hackPercent})`;
 
       const formattedRow = `| ${padStringLeft(row.hostname, columnWidths.hostname)} | ${padStringRight(growText, growColWidth)} | ${padStringRight(weakenText, weakenColWidth)} | ${padStringRight(hackText, hackColWidth)} | ${padStringRight(row.totalValue, columnWidths.total)} |`;
-      ns.print(formattedRow);
+      inform(ns, formattedRow);
     }
 
-    ns.print('\n');
+    inform(ns, '\n');
   } catch (error) {
     // Catch any errors in the table printing
     notify(ns, `Error printing table: ${error}`);
@@ -267,22 +338,6 @@ export function c2c_setup(
     ns.exec(SCRIPTS_DIR + COMMANDS.weaken.src, server, weakenThreads, target);
   }
 
-  notify(
-    ns,
-    server +
-      ' | ' +
-      'g[' +
-      formatNumber(ns, growThreads, 0) +
-      '] ' +
-      'w[' +
-      formatNumber(ns, weakenThreads, 0) +
-      '] ' +
-      'h[' +
-      formatNumber(ns, hackThreads, 0) +
-      '] ' +
-      (target ? '@' + target : '')
-  );
-
   return {
     hack: hackThreads,
     grow: growThreads,
@@ -312,20 +367,12 @@ function c2c_setup_single(
 function optimize_server_allocation(
   ns: NS,
   server: string,
-  reserved_on_home: number,
+  c2c_state: C2CState,
   processes: ProcessInfo[]
-): OptimizationResult {
-  // Group processes by script type
-  const threadsBase: TaskAllocation = {
-    hack: 0,
-    grow: 0,
-    weaken: 0,
-  };
-
+): ServerAllocation[] {
   const currentThreadsTotal: { [key: string]: TaskAllocation } = {};
   const currentTargets: string[] = [];
-
-  const results: TaskAllocation = structuredClone(threadsBase);
+  const results: ServerAllocation[] = [];
 
   try {
     // Calculate available RAM
@@ -333,11 +380,11 @@ function optimize_server_allocation(
     const maxRam = ns.getServerMaxRam(server);
     let availableRam = maxRam - usedRam;
 
-    if (server === 'home') availableRam -= reserved_on_home;
+    if (server === 'home') availableRam -= c2c_state.reserved_on_home;
 
     if (availableRam < 1.75) {
       // Not enough RAM to do anything meaningful
-      return { targets: currentTargets, threads: threadsBase };
+      return results;
     }
 
     // Map script filenames to task types
@@ -360,7 +407,7 @@ function optimize_server_allocation(
         if (!currentTargets.includes(hostname)) currentTargets.push(hostname);
 
         if (!currentThreadsTotal.hasOwnProperty(hostname)) {
-          currentThreadsTotal[hostname] = structuredClone(threadsBase);
+          currentThreadsTotal[hostname] = structuredClone(BASE_ALLOCATION);
         }
 
         currentThreadsTotal[hostname][taskType] += proc.threads;
@@ -409,7 +456,7 @@ function optimize_server_allocation(
 
       // If no deficit, no need to adjust
       if (biggestDeficit <= 0) {
-        return { targets: currentTargets, threads: threadsBase };
+        return;
       }
 
       // Calculate how many threads we can add for the deficient task
@@ -417,7 +464,7 @@ function optimize_server_allocation(
       const additionalThreads = Math.floor(ramPerTarget / scriptRam);
 
       if (additionalThreads <= 0) {
-        return { targets: currentTargets, threads: threadsBase };
+        return;
       }
 
       // Launch additional threads for the most deficient task
@@ -429,24 +476,33 @@ function optimize_server_allocation(
           target
         );
 
-        results[mostDeficientTask] += additionalThreads;
-        notify(
-          ns,
-          `Optimized ${server} | +${mostDeficientTask}[${additionalThreads}] @${target}`
-        );
+        let resultsItem = results.find((t) => t.hostname === target);
+        if (!resultsItem) {
+          const targetItem = c2c_state.targets.find(
+            (t) => t.hostname === target
+          );
+
+          resultsItem = {
+            ...targetItem,
+            tasks: structuredClone(BASE_ALLOCATION),
+          };
+        }
+
+        resultsItem.tasks[mostDeficientTask] += additionalThreads;
       } catch (error) {
         notify(
           ns,
           `Error launching ${mostDeficientTask} on ${server}: ${error}`
         );
-        return { targets: currentTargets, threads: threadsBase };
+        return;
       }
     });
 
-    return { targets: currentTargets, threads: results };
+    printC2CAssign(ns, results, `Optimized ${server}`);
+    return results;
   } catch (error) {
     notify(ns, `Error optimizing ${server}: ${error}`);
-    return { targets: currentTargets, threads: threadsBase };
+    return results;
   }
 }
 
@@ -556,55 +612,15 @@ function hack_setup(
   ns: NS,
   c2c_state: C2CState,
   server: string
-): { targets: TargetData[]; threads: TaskAllocation } {
+): ServerAllocation[] {
   const validTargets = c2c_state.targets.filter(
     (t) => t.data && t.data.time && t.data.money && t.data.money.max > 0
   );
 
   if (validTargets.length === 0) {
     notify(ns, 'No valid targets found for weighted selection.', 'c2c');
-    return {
-      targets: [],
-      threads: { hack: 0, grow: 0, weaken: 0, ddos: 0, share: 0 },
-    };
+    return [];
   }
-
-  const targets: TargetData[] = Array(3)
-    .fill(0)
-    .map(() =>
-      weighted_random(
-        validTargets,
-        validTargets.map((t) => {
-          // Data must exist based on validTargets filter
-          return t.data.time / t.data.money.max;
-        })
-      )
-    );
-
-  // Check if weighted_random returned valid targets
-  if (
-    !targets ||
-    targets.length === 0 ||
-    !targets.every((t) => t !== undefined && t !== null)
-  ) {
-    notify(
-      ns,
-      'Weighted random selection failed to return valid targets for ' + server,
-      'c2c'
-    );
-    return {
-      targets: [],
-      threads: { hack: 0, grow: 0, weaken: 0, ddos: 0, share: 0 },
-    };
-  }
-
-  let allocatedThreads: TaskAllocation = {
-    hack: 0,
-    grow: 0,
-    weaken: 0,
-    ddos: 0,
-    share: 0,
-  };
 
   const availableRam: number = getFreeRAM(
     ns,
@@ -619,31 +635,59 @@ function hack_setup(
       `${server} | Not enough RAM for any setup (${availableRam.toFixed(2)}GB free)`,
       'c2c'
     );
-    return { targets: targets, threads: allocatedThreads };
+    return [];
   }
 
-  // Split thread between 4 random targets if more than 32GB ram
-  if (availableRam < 64) {
-    allocatedThreads = c2c_setup(ns, server, targets[0].hostname, availableRam);
-  } else {
-    const ramPerTarget = availableRam / targets.length;
+  const minRamPerTarget = 32; // Too small numbers throw off balance between hack/grow/weaken
+  const maxTargets = Math.max(Math.floor(availableRam / minRamPerTarget), 1);
 
-    targets.forEach((target, index) => {
-      const additional = index !== 0;
-      const targetThreads = c2c_setup(
-        ns,
-        server,
-        target.hostname,
-        ramPerTarget,
-        additional
-      );
+  const targets: Target[] = Array(maxTargets)
+    .fill(0)
+    .map(() =>
+      weighted_random(
+        validTargets,
+        validTargets.map((t) => {
+          // Data must exist based on validTargets filter
+          return t.data.money.max / t.data.time;
+        })
+      )
+    );
 
-      allocatedThreads.hack += targetThreads.hack;
-      allocatedThreads.grow += targetThreads.grow;
-      allocatedThreads.weaken += targetThreads.weaken;
-    });
+  if (
+    !targets ||
+    targets.length === 0 ||
+    !targets.every((t) => t !== undefined && t !== null)
+  ) {
+    notify(ns, 'Failed to return valid targets for ' + server, 'c2c');
+    return [];
   }
-  return { targets, threads: allocatedThreads };
+  const results = validTargets.map((target) => ({
+    ...target,
+    tasks: structuredClone(BASE_ALLOCATION),
+  }));
+
+  const ramPerTarget = availableRam / targets.length;
+
+  targets.forEach((target, index) => {
+    const additional = index !== 0;
+    const targetThreads = c2c_setup(
+      ns,
+      server,
+      target.hostname,
+      ramPerTarget,
+      additional
+    );
+
+    const resultsItem = results.find((res) => res.hostname === target.hostname);
+
+    resultsItem.tasks.hack += targetThreads.hack;
+    resultsItem.tasks.grow += targetThreads.grow;
+    resultsItem.tasks.weaken += targetThreads.weaken;
+  });
+
+  printC2CAssign(ns, results, `Add ${server} to botnet`);
+
+  return results;
 }
 
 function weighted_random<T>(items: T[], weights: number[]): T | undefined {
@@ -714,25 +758,6 @@ function getFreeRAM(ns: NS, server: string, reserved_on_home: number) {
   return server === 'home' ? maxRam - allocated - reserved_on_home : maxRam;
 }
 
-const base_allocation = {
-  grow: 0,
-  weaken: 0,
-  hack: 0,
-  ddos: 0,
-};
-
-const base_c2c_state = {
-  allocations: {},
-  hack: [],
-  grow: [],
-  weaken: [],
-  ddos: [],
-  share: [],
-  goal: undefined,
-  targets: [],
-  reserved_on_home: 0,
-};
-
 /** @param {NS} ns */
 export async function main(ns: NS) {
   disable_logs(ns, [
@@ -748,10 +773,11 @@ export async function main(ns: NS) {
     'getServerMaxRam',
     'sleep',
   ]);
+  notify(ns, 'C2C SERVER STARTED');
 
   let useless = [...IGNORE];
 
-  let c2c_state = structuredClone(base_c2c_state);
+  let c2c_state = structuredClone(BASE_C2C_STATE);
 
   try {
     const savedStateData = ns.peek(STATE_PORT);
@@ -766,7 +792,7 @@ export async function main(ns: NS) {
       if (
         savedState &&
         typeof savedState === 'object' &&
-        Object.keys(base_c2c_state).every((key) =>
+        Object.keys(BASE_C2C_STATE).every((key) =>
           savedState.hasOwnProperty(key)
         )
       ) {
@@ -787,7 +813,7 @@ export async function main(ns: NS) {
     }
   } catch (error) {
     notify(ns, 'Error loading saved state: ' + error, 'c2c', 'error');
-    c2c_state = structuredClone(base_c2c_state);
+    c2c_state = structuredClone(BASE_C2C_STATE);
   }
 
   while (true) {
@@ -819,7 +845,7 @@ export async function main(ns: NS) {
       // Reset tasks for all targets
       if (c2c_state.targets && c2c_state.targets.length > 0) {
         c2c_state.targets.forEach((target) => {
-          target.tasks = structuredClone(base_allocation);
+          target.tasks = structuredClone(BASE_ALLOCATION);
           c2c_state.allocations[target.hostname] = target;
         });
       }
@@ -869,7 +895,7 @@ export async function main(ns: NS) {
 
       // Reset tasks for all targets
       c2c_state.targets.forEach((target) => {
-        target.tasks = structuredClone(base_allocation);
+        target.tasks = structuredClone(BASE_ALLOCATION);
         c2c_state.allocations[target.hostname] = target;
       });
 
@@ -979,94 +1005,70 @@ export async function main(ns: NS) {
             c2c_state.ddos.includes(server) ||
             c2c_state.share.includes(server);
 
-          let allocatedThreads: TaskAllocation =
-            structuredClone(base_allocation);
-          let currTargets = [];
+          let addedAllocation: ServerAllocation[] = [];
 
           if (!isAllocated) {
             // New server - set up all scripts in proper ratio
-            const { targets, threads } = hack_setup(ns, c2c_state, server);
-
-            currTargets = targets;
-            allocatedThreads = threads;
-
-            if (allocatedThreads) {
-              // Add server to all task lists since it's running all types
-              c2c_state.hack.push(server);
-              c2c_state.grow.push(server);
-              c2c_state.weaken.push(server);
-            } else {
-              useless.push(server);
-              i++;
-              continue;
-            }
+            addedAllocation = hack_setup(ns, c2c_state, server);
           } else {
             // Existing server - optimize current allocation
 
             // If no processes are running, do a full setup
             const processes = ns.ps(server);
             if (processes.length === 0) {
-              const { targets, threads } = hack_setup(ns, c2c_state, server);
-              currTargets = targets;
-              allocatedThreads = threads;
+              addedAllocation = hack_setup(ns, c2c_state, server);
             } else {
-              const { targets, threads } = optimize_server_allocation(
+              addedAllocation = optimize_server_allocation(
                 ns,
                 server,
-                c2c_state.reserved_on_home,
+                c2c_state,
                 processes
               );
-
-              if (targets) {
-                currTargets = targets.map((name: any) =>
-                  c2c_state.targets.find((target) => target.hostname === name)
-                );
-              }
-
-              allocatedThreads = threads;
             }
 
-            if (!allocatedThreads) {
+            if (!addedAllocation) {
               i++;
               continue; // Nothing changed
             }
+          }
 
-            const hackAdded = allocatedThreads.hack > 0;
-            const growAdded = allocatedThreads.grow > 0;
-            const weakenAdded = allocatedThreads.weaken > 0;
+          if (!addedAllocation) {
+            if (!isAllocated) {
+              useless.push(server);
+            }
 
-            // Update server task lists if needed
-            if (hackAdded && !c2c_state.hack.includes(server)) {
-              c2c_state.hack.push(server);
-            }
-            if (growAdded && !c2c_state.grow.includes(server)) {
-              c2c_state.grow.push(server);
-            }
-            if (weakenAdded && !c2c_state.weaken.includes(server)) {
-              c2c_state.weaken.push(server);
-            }
+            i++;
+            continue;
           }
 
           // Update allocation counts in state
-          if (allocatedThreads && currTargets) {
-            for (let i in currTargets) {
-              const target = currTargets[i];
-              if (target) {
-                // Make sure the target allocation exists
-                if (!c2c_state.allocations[target.hostname]) {
-                  c2c_state.allocations[target.hostname] = {
-                    tasks: structuredClone(base_allocation),
-                  };
-                }
+          if (addedAllocation) {
+            addedAllocation.forEach(({ hostname, tasks }) => {
+              const hackAdded = tasks.hack > 0;
+              const growAdded = tasks.grow > 0;
+              const weakenAdded = tasks.weaken > 0;
 
-                c2c_state.allocations[target.hostname].tasks.hack +=
-                  allocatedThreads.hack;
-                c2c_state.allocations[target.hostname].tasks.grow +=
-                  allocatedThreads.grow;
-                c2c_state.allocations[target.hostname].tasks.weaken +=
-                  allocatedThreads.weaken;
+              // Update server task lists if needed
+              if (hackAdded && !c2c_state.hack.includes(server)) {
+                c2c_state.hack.push(server);
               }
-            }
+              if (growAdded && !c2c_state.grow.includes(server)) {
+                c2c_state.grow.push(server);
+              }
+              if (weakenAdded && !c2c_state.weaken.includes(server)) {
+                c2c_state.weaken.push(server);
+              }
+
+              if (!c2c_state.allocations[hostname]) {
+                c2c_state.allocations[hostname] = {
+                  tasks,
+                };
+              } else {
+                c2c_state.allocations[hostname].tasks.hack += tasks.hack;
+                c2c_state.allocations[hostname].tasks.grow += tasks.grow;
+                c2c_state.allocations[hostname].tasks.weaken += tasks.weaken;
+              }
+            });
           }
         }
         await ns.sleep(1000);
