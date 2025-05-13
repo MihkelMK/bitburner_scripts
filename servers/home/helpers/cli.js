@@ -1,0 +1,76 @@
+/** 
+ * Disable certain logs from appearing in CLI output. ALL silences everything.
+ * @param {NS} ns
+ * @param {string[]} logs Log types to disable
+*/
+export function disable_logs(ns, logs) {
+  for (var i in logs) {
+    ns.disableLog(logs[i])
+  }
+}
+
+/**
+ * Command log and optional toast message with one command
+ * @param {NS} ns
+ * @param {string} message
+ * @param {string} prefix Display toast message with this at the start (eg. "c2c")
+ * @param {"success" | "warning" | "error" | "info" | undefined} variant Type of the toast message (default "info")
+*/
+export function notify(ns, message, prefix, variant = "info") {
+  if (!message) return;
+
+  // Add timestamp to print calls
+  const timestamp = new Date().toLocaleTimeString("et");
+  ns.print(`[${timestamp}] ${message}`);
+
+  // Only show toast if prefix is provided
+  if (prefix) {
+    ns.toast(prefix + ": " + message, variant);
+  }
+}
+
+/**
+ * Formats a number to abbreviated notation (K, M, B, T)
+ * @param {number} value The value to format
+ * @param {number} [decimals=1] Number of decimal places to show
+ * @return {string} Formatted string
+ */
+export function formatNumber(value, decimals) {
+  if (value === null || value === undefined || isNaN(value)) {
+    return "0";
+  }
+
+  // Handle negative values
+  const isNegative = value < 0;
+  const absValue = Math.abs(value);
+
+  let result;
+
+  if (absValue >= 1000000000000) {
+    result = `${(absValue / 1000000000000).toFixed(decimals)}T`;
+  } else if (absValue >= 1000000000) {
+    result = `${(absValue / 1000000000).toFixed(decimals)}B`;
+  } else if (absValue >= 1000000) {
+    result = `${(absValue / 1000000).toFixed(decimals)}M`;
+  } else if (absValue >= 1000) {
+    result = `${(absValue / 1000).toFixed(decimals)}K`;
+  } else {
+    result = absValue.toFixed(decimals);
+  }
+
+  // Remove trailing zeros after decimal point
+  result = result.replace(/\.0+([KMBTkmbt])?$/, '$1');
+
+  return `${isNegative ? '-' : ''}${result}`;
+}
+
+/**
+ * Formats a number to abbreviated currency notation (K, M, B, T)
+ * @param {number} value The monetary value to format
+ * @param {number} [decimals=1] Number of decimal places to show
+ * @param {string} [currency='$'] Currency symbol to prepend
+ * @return {string} Formatted currency string
+ */
+export function formatCurrency(value, decimals = 1, currency = '$') {
+  return currency + formatNumber(value, decimals);
+}
