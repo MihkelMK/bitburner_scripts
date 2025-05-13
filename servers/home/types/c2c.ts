@@ -20,21 +20,22 @@ export interface TaskAllocation {
   share?: number;
 }
 
-export interface ServerData {
-  time: number;
-  money: { max: number };
-  // Add other server data properties as needed based on usage
-}
-
 export interface TargetData {
-  hostname: string;
-  tasks: TaskAllocation;
-  data: ServerData; // Assuming 'data' holds server info like time and money
+  money: { max: number; current: number };
+  security: { min: number; base: number; current: number };
+  growth: number;
+  time: number;
+  chance: number;
 }
 
-export interface ServerAllocation {
+export interface Target {
+  hostname: string;
+  data: TargetData;
+  score?: number;
+}
+
+export interface ServerAllocation extends Target {
   tasks: TaskAllocation;
-  data?: ServerData; // Optional data if needed per server in allocations
 }
 
 export interface C2CState {
@@ -45,7 +46,7 @@ export interface C2CState {
   ddos: string[];
   share: string[];
   goal: string | undefined;
-  targets: TargetData[];
+  targets: Target[];
   reserved_on_home: number;
 }
 

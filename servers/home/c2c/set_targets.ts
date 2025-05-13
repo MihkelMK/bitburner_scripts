@@ -1,4 +1,6 @@
+import { enum_target } from '../helpers/cli.js';
 import { TARGET_PORT } from '../helpers/ports.js';
+import { Target } from '../types/c2c.js';
 
 /**
  * @param data - context about the game, useful when autocompleting
@@ -16,37 +18,6 @@ export function autocomplete(data: AutocompleteData, args: string[]): string[] {
   }
 
   return newServers;
-}
-
-interface TargetData {
-  money: { max: number; current: number };
-  security: { min: number; base: number; current: number };
-  growth: number;
-  time: number;
-  chance: number;
-}
-
-interface Target {
-  hostname: string;
-  score: number;
-  data: TargetData;
-}
-
-function enum_target(ns: NS, server: string): TargetData {
-  return {
-    money: {
-      max: ns.getServerMaxMoney(server),
-      current: ns.getServerMoneyAvailable(server),
-    },
-    security: {
-      min: ns.getServerMinSecurityLevel(server),
-      base: ns.getServerBaseSecurityLevel(server),
-      current: ns.getServerSecurityLevel(server),
-    },
-    growth: ns.getServerGrowth(server),
-    time: ns.getHackTime(server),
-    chance: ns.hackAnalyzeChance(server),
-  };
 }
 
 function find_targets(ns: NS, servers: string[]): Target[] {
