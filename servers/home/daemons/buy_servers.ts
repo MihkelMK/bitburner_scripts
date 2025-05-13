@@ -20,6 +20,7 @@ export async function main(ns: NS) {
     'getPurchasedServerUpgradeCost',
     'purchaseServer',
   ]);
+  notify(ns, 'SERVER FARM STARTED');
 
   // C2C action takes 1.7GB so 2 is enough to start
   const first_ram = 2;
