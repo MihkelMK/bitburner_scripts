@@ -31,14 +31,14 @@ This template uses [esbuild](https://esbuild.github.io/) to bundle your scripts.
 This template allows you to use the ingame instances of `React` and `ReactDOM` simply by importing them as ESModule as you usually would.
 
 ```jsx
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
 export function MyComponent() {
   const [count, setCount] = useState(0);
 
   return (
     <div>
-      Count {count}{" "}
+      Count {count}{' '}
       <button onClick={() => setCount(count + 1)}>Add to count</button>
     </div>
   );
@@ -57,34 +57,33 @@ You can enable mirroring like this
 const createContext = async () =>
   await context({
     entryPoints: [
-      "servers/**/*.js",
-      "servers/**/*.jsx",
-      "servers/**/*.ts",
-      "servers/**/*.tsx",
+      'servers/**/*.js',
+      'servers/**/*.jsx',
+      'servers/**/*.ts',
+      'servers/**/*.tsx',
     ],
-    outbase: "./servers",
-    outdir: "./build",
+    outbase: './servers',
+    outdir: './build',
     plugins: [
       BitburnerPlugin({
         port: 12525,
-        types: "NetscriptDefinitions.d.ts",
+        types: 'NetscriptDefinitions.d.ts',
         mirror: {
-          "local/path": ["home", "and/or other servers"],
+          'local/path': ['home', 'and/or other servers'],
         },
       }),
     ],
     bundle: true,
-    format: "esm",
-    platform: "browser",
-    logLevel: "info",
+    format: 'esm',
+    platform: 'browser',
+    logLevel: 'info',
   });
 
 let ctx = await createContext();
 ctx.watch();
 ```
 
-This will mirror all listed servers for a path to a specified location.
-While mirroring, all changes in the game will be synced with your editor and vice versa.
+This will mirror all listed servers for a path to a specified location. While mirroring, all changes in the game will be synced with your editor and vice versa.
 
 ### Automatic Distribution
 
@@ -94,26 +93,26 @@ You can specify folders with a list of servers to automatically distribute your 
 const createContext = async () =>
   await context({
     entryPoints: [
-      "servers/**/*.js",
-      "servers/**/*.jsx",
-      "servers/**/*.ts",
-      "servers/**/*.tsx",
+      'servers/**/*.js',
+      'servers/**/*.jsx',
+      'servers/**/*.ts',
+      'servers/**/*.tsx',
     ],
-    outbase: "./servers",
-    outdir: "./build",
+    outbase: './servers',
+    outdir: './build',
     plugins: [
       BitburnerPlugin({
         port: 12525,
-        types: "NetscriptDefinitions.d.ts",
+        types: 'NetscriptDefinitions.d.ts',
         distribute: {
-          "build/home/dist": ["server-1", "server-2", "server-3"],
+          'build/home/dist': ['server-1', 'server-2', 'server-3'],
         },
       }),
     ],
     bundle: true,
-    format: "esm",
-    platform: "browser",
-    logLevel: "info",
+    format: 'esm',
+    platform: 'browser',
+    logLevel: 'info',
   });
 
 let ctx = await createContext();
@@ -127,51 +126,51 @@ In this example all files that are developed in 'servers/home/dist' will not onl
 You can provide plugin extensions with hooks that trigger before and after certain events. Within hooks that gurantee that the plugin is connected to the game, you also get full access to the remote file API. Using extensions would look something like this:
 
 ```js
-import { context } from "esbuild";
-import { BitburnerPlugin } from "esbuild-bitburner-plugin";
+import { context } from 'esbuild';
+import { BitburnerPlugin } from 'esbuild-bitburner-plugin';
 
 /** @type import('esbuild-bitburner-plugin').PluginExtension*/
 const customExtension = {
   setup() {
-    console.log("setup");
+    console.log('setup');
   }, //Run once on plugin startup
 
   beforeConnect() {
-    console.log("beforeConnect");
+    console.log('beforeConnect');
   }, //Run once before the game connects
   afterConnect(remoteAPI) {
-    console.log("afterConnect");
+    console.log('afterConnect');
   }, //Run every time after the game (re)connects
 
   beforeBuild() {
-    console.log("beforeBuild");
+    console.log('beforeBuild');
   }, //Run before every build process
   afterBuild(remoteAPI) {
-    console.log("afterBuild");
+    console.log('afterBuild');
   }, //Run after build results have been uploaded into the game
 };
 
 const createContext = async () =>
   await context({
     entryPoints: [
-      "servers/**/*.js",
-      "servers/**/*.jsx",
-      "servers/**/*.ts",
-      "servers/**/*.tsx",
+      'servers/**/*.js',
+      'servers/**/*.jsx',
+      'servers/**/*.ts',
+      'servers/**/*.tsx',
     ],
-    outbase: "./servers",
-    outdir: "./build",
+    outbase: './servers',
+    outdir: './build',
     plugins: [
       BitburnerPlugin({
         port: 12525,
-        types: "NetscriptDefinitions.d.ts",
+        types: 'NetscriptDefinitions.d.ts',
         extensions: [customExtension],
       }),
     ],
     bundle: true,
-    format: "esm",
-    platform: "browser",
-    logLevel: "info",
+    format: 'esm',
+    platform: 'browser',
+    logLevel: 'info',
   });
 
 let ctx = await createContext();
@@ -186,24 +185,24 @@ This tool supports remote debugging for both the Steam version and the web versi
 const createContext = async () =>
   await context({
     entryPoints: [
-      "servers/**/*.js",
-      "servers/**/*.jsx",
-      "servers/**/*.ts",
-      "servers/**/*.tsx",
+      'servers/**/*.js',
+      'servers/**/*.jsx',
+      'servers/**/*.ts',
+      'servers/**/*.tsx',
     ],
-    outbase: "./servers",
-    outdir: "./build",
+    outbase: './servers',
+    outdir: './build',
     plugins: [
       BitburnerPlugin({
         port: 12525,
-        types: "NetscriptDefinitions.d.ts",
+        types: 'NetscriptDefinitions.d.ts',
         remoteDebugging: true,
       }),
     ],
     bundle: true,
-    format: "esm",
-    platform: "browser",
-    logLevel: "info",
+    format: 'esm',
+    platform: 'browser',
+    logLevel: 'info',
   });
 
 const ctx = await createContext();
