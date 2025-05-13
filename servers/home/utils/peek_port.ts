@@ -31,7 +31,7 @@ export async function main(ns: NS) {
   // Pretty print if JSON data
   try {
     const json = JSON.parse(value);
-    ns.print(JSON.stringify(json, null, 1));
+    ns.tprint(JSON.stringify(json, null, 1));
   } catch {
     ns.tprintf(value);
   }
