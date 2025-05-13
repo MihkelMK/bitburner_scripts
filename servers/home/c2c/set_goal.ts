@@ -18,7 +18,6 @@ export function autocomplete(
   return GOALS;
 }
 
-/** @param {NS} ns */
 export async function main(ns: NS) {
   const args = ns.flags([['help', false]]);
 
