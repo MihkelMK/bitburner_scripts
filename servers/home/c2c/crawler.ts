@@ -1,11 +1,11 @@
-import { disable_logs, notify } from '../helpers/cli.js';
-import { connectWithHops } from '../utils/connect_with_hops.js';
+import { disable_logs, notify } from '../helpers/cli';
+import { HacksDictionary } from '../types/c2c';
+import { connectWithHops } from '../utils/connect_with_hops';
 
 const IGNORE = ['darkweb', 'home'];
 const SLEEP_MIN = 2;
 
-/** @param {NS} ns */
-function run_hacks(ns, server, hacks_dict) {
+function run_hacks(ns: NS, server: string, hacks_dict: HacksDictionary) {
   let hacks = 0;
   for (let hack in hacks_dict) {
     if (hacks_dict[hack]) {
@@ -32,8 +32,7 @@ function run_hacks(ns, server, hacks_dict) {
   return hacks;
 }
 
-/** @param {NS} ns */
-export function hack_target(ns, target, hacks) {
+export function hack_target(ns: NS, target: string, hacks: HacksDictionary) {
   // Make sure we can actually NUKE this server
   let ports_needed = ns.getServerNumPortsRequired(target);
 
@@ -56,8 +55,7 @@ export function hack_target(ns, target, hacks) {
   return false;
 }
 
-/** @param {NS} ns */
-async function backdoor_target(ns, target) {
+async function backdoor_target(ns: NS, target: string) {
   try {
     if (!connectWithHops(ns, ns.getHostname(), target)) {
       return false;
@@ -73,8 +71,7 @@ async function backdoor_target(ns, target) {
   }
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   disable_logs(ns, [
     'scan',
     'run',
@@ -99,12 +96,12 @@ export async function main(ns) {
       smtp: ns.fileExists('relaySMTP.exe'),
     };
     let total_hacks = Object.entries(hacks_dict).filter(
-      ([name, exists]) => exists
+      ([_, exists]) => exists
     ).length;
 
     let servers = Array(ns.scan())[0];
-    let serv_set = Array(servers);
-    serv_set.push('home');
+    let serv_set = new Set(servers);
+    serv_set.add('home');
 
     let i = 0;
     let waiting = false;
@@ -143,9 +140,8 @@ export async function main(ns) {
       let s = ns.scan(server);
       for (let j in s) {
         let con = s[j];
-        if (!serv_set.includes(con)) {
-          //if (serv_set.indexOf(con) < 0) {
-          serv_set.push(con);
+        if (!serv_set.has(con)) {
+          serv_set.add(con);
           servers.push(con);
         }
       }

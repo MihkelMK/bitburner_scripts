@@ -1,9 +1,9 @@
 /**
- * @param {AutocompleteData} data - context about the game, useful when autocompleting
- * @param {string[]} args - current arguments, not including "run script.js"
- * @returns {string[]} - the array of possible autocomplete options
+ * @param data - context about the game, useful when autocompleting
+ * @param args - current arguments, not including "run script.js"
+ * @returns the array of possible autocomplete options
  */
-export function autocomplete(data, args) {
+export function autocomplete(data: AutocompleteData, args: string[]): string[] {
   const scripts = data.scripts;
 
   if (args[0]) {
@@ -13,10 +13,9 @@ export function autocomplete(data, args) {
   return scripts;
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   const args = ns.flags([['help', false]]);
-  if (args.help || args._.length < 1) {
+  if (args.help || ns.args.length < 1) {
     ns.tprint('Run script with maximum threads, optionally keep some GB free.');
     ns.tprint(`Usage: run ${ns.getScriptName()} SCRIPT KEEPFREE`);
     ns.tprint('Example:');
@@ -25,8 +24,8 @@ export async function main(ns) {
   }
 
   const server = ns.getHostname();
-  const script = args._[0];
-  const keepfree = args._.length > 1 ? Number(args._[1]) : 0;
+  const script = String(ns.args.at(0));
+  const keepfree = ns.args.length > 1 ? Number(ns.args.at(1)) : 0;
 
   if (!ns.ls(server).find((f) => f === script)) {
     ns.tprint(`Script '${script}' does not exist. Aborting.`);
@@ -44,4 +43,3 @@ export async function main(ns) {
     ns.spawn(script, { threads: threads, spawnDelay: 0 });
   }
 }
-

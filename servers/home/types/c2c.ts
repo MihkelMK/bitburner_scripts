@@ -53,3 +53,12 @@ export interface OptimizationResult {
   targets: string[]; // Hostnames of targets optimized for
   threads: TaskAllocation; // Total threads *added* during this optimization run
 }
+
+export interface HacksDictionary {
+  brute: boolean;
+  ftp: boolean;
+  http: boolean;
+  sql: boolean;
+  smtp: boolean;
+  [key: string]: boolean; // Allow other properties just in case, though the switch only uses these five
+}

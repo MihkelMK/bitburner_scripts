@@ -1,11 +1,11 @@
-import { findOptimalPath } from '../utils/pathtoserver.js';
+import { findOptimalPath } from './pathtoserver';
 
 /**
- * @param {AutocompleteData} data - context about the game, useful when autocompleting
- * @param {string[]} args - current arguments, not including "run script.js"
- * @returns {string[]} - the array of possible autocomplete options
+ * @param data - context about the game, useful when autocompleting
+ * @param args - current arguments, not including "run script.js"
+ * @returns the array of possible autocomplete options
  */
-export function autocomplete(data, args) {
+export function autocomplete(data: AutocompleteData, args: string[]): string[] {
   const servers = data.servers;
 
   if (args[0]) {
@@ -15,8 +15,7 @@ export function autocomplete(data, args) {
   return servers;
 }
 
-/** @param {NS} ns */
-export function connectWithHops(ns, start, dest) {
+export function connectWithHops(ns: NS, start: string, dest: string): boolean {
   const path = findOptimalPath(ns, start, dest);
 
   for (let i in path) {
@@ -30,16 +29,14 @@ export function connectWithHops(ns, start, dest) {
   return true;
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   // Check if arguments were provided
   if (ns.args.length < 1) {
     ns.tprint('Usage: run ssh [target-hostname]');
     return;
   }
 
-  const targetHost = ns.args[0];
+  const targetHost = String(ns.args[0]);
 
   connectWithHops(ns, ns.getHostname(), targetHost);
 }
-

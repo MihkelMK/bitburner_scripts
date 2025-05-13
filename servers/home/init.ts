@@ -1,5 +1,4 @@
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   ns.scriptKill('c2c/server.js', ns.getHostname());
   ns.scriptKill('c2c/crawler.js', ns.getHostname());
   ns.scriptKill('daemons/buy_servers.js', ns.getHostname());
@@ -27,4 +26,3 @@ export async function main(ns) {
   // ns.run('c2c/set_targets.js', 1, 'foodnstuff');
   // ns.run("c2c/find_targets.js", 1, 1, "early")
 }
-

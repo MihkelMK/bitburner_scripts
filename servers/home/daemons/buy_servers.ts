@@ -1,17 +1,14 @@
 import { disable_logs, formatCurrency, notify } from '../helpers/cli.js';
 
-/** @param {NS} ns */
-function buy_cost(ns, ram) {
+function buy_cost(ns: NS, ram: number): number {
   return ns.getPurchasedServerCost(ram);
 }
 
-/** @param {NS} ns */
-function grow_cost(ns, ram, hostname) {
+function grow_cost(ns: NS, ram: number, hostname: string): number {
   return ns.getPurchasedServerUpgradeCost(hostname, ram);
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   disable_logs(ns, [
     'sleep',
     'getPurchasedServerLimit',
@@ -40,7 +37,7 @@ export async function main(ns) {
 
       notify(ns, `Buy ${hostname} with ${first_ram} GB`, 'bs');
     } else if (!waiting) {
-      notify(ns, `Waiting for ${formatCurrency(neededMoney)}`);
+      notify(ns, `Waiting for ${formatCurrency(ns, neededMoney)}`);
       waiting = true;
     }
 
@@ -70,7 +67,7 @@ export async function main(ns) {
 
         i++;
       } else if (!waiting) {
-        notify(ns, `Waiting for ${formatCurrency(neededMoney)}`);
+        notify(ns, `Waiting for ${formatCurrency(ns, neededMoney)}`);
         waiting = true;
       }
 
@@ -91,4 +88,3 @@ export async function main(ns) {
       ' GB.'
   );
 }
-

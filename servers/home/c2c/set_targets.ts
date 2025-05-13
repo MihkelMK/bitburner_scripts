@@ -1,11 +1,11 @@
 import { TARGET_PORT } from '../helpers/ports.js';
 
 /**
- * @param {AutocompleteData} data - context about the game, useful when autocompleting
- * @param {string[]} args - current arguments, not including "run script.js"
- * @returns {string[]} - the array of possible autocomplete options
+ * @param data - context about the game, useful when autocompleting
+ * @param args - current arguments, not including "run script.js"
+ * @returns - the array of possible autocomplete options
  */
-export function autocomplete(data, args) {
+export function autocomplete(data: AutocompleteData, args: string[]): string[] {
   const servers = data.servers;
   const newServers = servers.filter((server) => !args.includes(server));
 
@@ -18,8 +18,21 @@ export function autocomplete(data, args) {
   return newServers;
 }
 
-/** @param {NS} ns */
-function enum_target(ns, server) {
+interface TargetData {
+  money: { max: number; current: number };
+  security: { min: number; base: number; current: number };
+  growth: number;
+  time: number;
+  chance: number;
+}
+
+interface Target {
+  hostname: string;
+  score: number;
+  data: TargetData;
+}
+
+function enum_target(ns: NS, server: string): TargetData {
   return {
     money: {
       max: ns.getServerMaxMoney(server),
@@ -36,9 +49,8 @@ function enum_target(ns, server) {
   };
 }
 
-/** @param {NS} ns */
-function find_targets(ns, servers) {
-  const analyzed_servers = servers.map((server) => {
+function find_targets(ns: NS, servers: string[]): Target[] {
+  const analyzed_servers = servers.map((server: string) => {
     const data = enum_target(ns, server);
 
     const score = 1;
@@ -53,11 +65,10 @@ function find_targets(ns, servers) {
   return analyzed_servers;
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   const args = ns.flags([['help', false]]);
 
-  if (args.help || args._.length < 1) {
+  if (args.help || ns.args.length < 1) {
     ns.tprint('Target the botnet on one specific targets.');
     ns.tprint(`Usage: run ${ns.getScriptName()} TARGET1 TARGET2`);
     ns.tprint('Example:');
@@ -65,11 +76,13 @@ export async function main(ns) {
     return;
   }
 
-  const servers = args._;
+  const servers = args._ as string[];
 
   const targets = find_targets(ns, servers);
 
-  const target_names = targets.map((target) => target.hostname);
+  const target_names = targets.map(
+    (target: { hostname: string }) => target.hostname
+  );
   const target_string = target_names.join(', ');
 
   ns.print('Sending ' + target_string + ' to port ' + TARGET_PORT);

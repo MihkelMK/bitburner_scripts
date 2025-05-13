@@ -1,5 +1,4 @@
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   let total_hacks = 0;
 
   while (total_hacks < 5) {
@@ -32,9 +31,8 @@ export async function main(ns) {
     }
 
     total_hacks = Object.entries(hacks_dict).filter(
-      ([name, exists]) => exists
+      ([, exists]) => exists
     ).length;
     await ns.sleep(1000 * 60 * 2);
   }
 }
-

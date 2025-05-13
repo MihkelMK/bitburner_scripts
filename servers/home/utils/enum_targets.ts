@@ -1,4 +1,4 @@
-function scan(ns, parent, server, list) {
+function scan(ns: NS, parent: string, server: string, list: string[]) {
   const children = ns.scan(server);
   for (let child of children) {
     if (parent == child) {
@@ -10,14 +10,13 @@ function scan(ns, parent, server, list) {
   }
 }
 
-export function list_servers(ns) {
+export function list_servers(ns: NS): string[] {
   const list = [];
   scan(ns, '', 'home', list);
   return list;
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   const servers = list_servers(ns).filter(
     (s) => ns.hasRootAccess(s) && !s.includes('pserv')
   );
@@ -39,7 +38,5 @@ export async function main(ns) {
     ns.tprint('Curr Secr: ' + Math.round(ns.getServerSecurityLevel(server)));
     ns.tprint('Grothrate: ' + Math.round(ns.getServerGrowth(server)));
     ns.tprint('Hack time: ' + Math.round(ns.getHackTime(server)));
-    // ns.tprint(ns.ls(server))
   });
 }
-

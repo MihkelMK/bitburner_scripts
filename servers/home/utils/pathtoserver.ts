@@ -1,9 +1,9 @@
 /**
- * @param {AutocompleteData} data - context about the game, useful when autocompleting
- * @param {string[]} args - current arguments, not including "run script.js"
- * @returns {string[]} - the array of possible autocomplete options
+ * @param data - context about the game, useful when autocompleting
+ * @param args - current arguments, not including "run script.js"
+ * @returns the array of possible autocomplete options
  */
-export function autocomplete(data, args) {
+export function autocomplete(data: AutocompleteData, args: string[]): string[] {
   const servers = data.servers;
 
   if (args[0]) {
@@ -13,15 +13,14 @@ export function autocomplete(data, args) {
   return servers;
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   // Check if arguments were provided
   if (ns.args.length < 1) {
-    ns.tprint('Usage: run find-path.js [target-hostname]');
+    ns.tprint(`Usage: run ${ns.getScriptName()} [target-hostname]`);
     return;
   }
 
-  const targetHost = ns.args[0];
+  const targetHost = String(ns.args[0]);
   let scanRange = 3;
 
   if (ns.fileExists('DeepscanV1.exe')) scanRange = 5;
@@ -70,7 +69,7 @@ export async function main(ns) {
  * @param {string} to - Target hostname
  * @returns {number} - Distance between servers
  */
-function getDistance(ns, from, to) {
+function getDistance(ns: NS, from: string, to: string): number {
   if (from === to) return 0;
 
   const visited = new Set();
@@ -97,12 +96,16 @@ function getDistance(ns, from, to) {
 
 /**
  * Finds the optimal path from start to target hostname using backdoored servers as shortcuts
- * @param {NS} ns - Netscript API
- * @param {string} start - Starting hostname
- * @param {string} target - Target hostname
- * @returns {string[]} - Array of hostnames representing the path
+ * @param ns - Netscript API
+ * @param start - Starting hostname
+ * @param target - Target hostname
+ * @returns  Array of hostnames representing the path
  */
-export function findOptimalPath(ns, start, target) {
+export function findOptimalPath(
+  ns: NS,
+  start: string,
+  target: string
+): string[] {
   // Get all backdoored servers in the network
   const backdooredServers = getAllBackdooredServers(ns);
 
@@ -144,7 +147,7 @@ export function findOptimalPath(ns, start, target) {
  * @param {NS} ns - Netscript API
  * @returns {string[]} - Array of hostnames with backdoors installed
  */
-function getAllBackdooredServers(ns) {
+function getAllBackdooredServers(ns: NS): string[] {
   const visited = new Set();
   const queue = ['home'];
   const backdoored = [];
@@ -174,12 +177,12 @@ function getAllBackdooredServers(ns) {
 
 /**
  * Finds the shortest path from start to target hostname
- * @param {NS} ns - Netscript API
- * @param {string} start - Starting hostname
- * @param {string} target - Target hostname
- * @returns {string[]} - Array of hostnames representing the path
+ * @param ns - Netscript API
+ * @param start - Starting hostname
+ * @param target - Target hostname
+ * @returns Array of hostnames representing the path
  */
-function findPath(ns, start, target) {
+function findPath(ns: NS, start: string, target: string): string[] {
   // Queue for BFS
   const queue = [];
   // Keep track of visited servers and their parents
@@ -223,12 +226,16 @@ function findPath(ns, start, target) {
 
 /**
  * Reconstructs the path from target to start using the parent map
- * @param {string} target - Target hostname
- * @param {Object} parent - Map of server to its parent
- * @param {string} start - Starting hostname
- * @returns {string[]} - Array of hostnames representing the path
+ * @param target - Target hostname
+ * @param parent - Map of server to its parent
+ * @param start - Starting hostname
+ * @returns Array of hostnames representing the path
  */
-function reconstructPath(target, parent, start) {
+function reconstructPath(
+  target: string,
+  parent: object,
+  start: string
+): string[] {
   const path = [];
   let current = target;
 
@@ -242,4 +249,3 @@ function reconstructPath(target, parent, start) {
   path.unshift(start);
   return path;
 }
-

@@ -13,19 +13,23 @@ const MIN_PURCHASE_MILLION = 500; // min total purchase cost in millions
 const MIN_EXIT_FORECAST_PERCENT = 0.05; // in case the forecast turn under this value than exit.
 const KEEP_MONEY_ON_HOME_MILLION = 1000; // how many million you want to keep out from trading (like for use it for something else)
 
-/** @param {NS} ns */
-function availableMoney(ns) {
+interface OwnedSymbol {
+  sym: string;
+  sharesShort: number;
+  shares: number;
+}
+
+function availableMoney(ns: NS): number {
   const money =
     ns.getServerMoneyAvailable('home') - KEEP_MONEY_ON_HOME_MILLION * 1000000;
   return money;
 }
 
-function canBuy(money) {
+function canBuy(money: number): boolean {
   return money >= MIN_PURCHASE_MILLION * 1000000;
 }
 
-/** @param {TIX} tix */
-function getSymbolPoint(tix, sym) {
+function getSymbolPoint(tix: TIX, sym: string): number {
   const forecast = tix.getForecast(sym) - 0.5;
   const adjustedForecast = forecast * (1 / MIN_FORECAST_PERCENT); // * Math.E
 
@@ -33,14 +37,13 @@ function getSymbolPoint(tix, sym) {
   else return adjustedForecast * tix.getVolatility(sym) * 100;
 }
 
-/** @param {TIX} tix */
-function sortAndFilterSymbols(tix) {
+function sortAndFilterSymbols(tix: TIX): string[] {
   const filteredSymbols = tix
     .getSymbols()
     .filter((a) => getSymbolPoint(tix, a) > 0) // check if it's even good for us to trade
     .filter((sym) => {
       // check if we didn't over buy this symbol
-      const [shares, avgPx, sharesShort, avgPxShort] = tix.getPosition(sym);
+      const [shares, , sharesShort] = tix.getPosition(sym);
       return (
         tix.getMaxShares(sym) * MAX_STOCK_OWNED_PERCENT >
         Math.max(shares, sharesShort)
@@ -51,20 +54,18 @@ function sortAndFilterSymbols(tix) {
   );
 }
 
-/** @param {TIX} tix */
-function getOwnedSymbols(tix) {
+function getOwnedSymbols(tix: TIX): OwnedSymbol[] {
   const symbols = tix
     .getSymbols()
     .map((sym) => {
-      const [shares, avgPx, sharesShort, avgPxShort] = tix.getPosition(sym);
+      const [shares, , sharesShort] = tix.getPosition(sym);
       return { sym, sharesShort, shares };
     })
     .filter((sym) => sym.sharesShort > 0 || sym.shares > 0);
   return symbols;
 }
 
-/** @param {NS} ns */
-function serversMaxxed(ns) {
+function serversMaxxed(ns: NS): boolean {
   const servers = ns.getPurchasedServers();
   const maxCount = ns.getPurchasedServerLimit();
 
@@ -81,8 +82,7 @@ function serversMaxxed(ns) {
   return true;
 }
 
-/** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   disable_logs(ns, [
     'getServerMoneyAvailable',
     'sleep',
@@ -111,7 +111,7 @@ export async function main(ns) {
         if (sellPrice > 0) {
           notify(
             ns,
-            `Sell ${formatNumber(shares)} x ${sym} for ${formatCurrency(sellPrice * shares)}.`,
+            `Sell ${formatNumber(ns, shares)} x ${sym} for ${formatCurrency(ns, sellPrice * shares)}.`,
             'trade'
           );
         }
@@ -125,7 +125,7 @@ export async function main(ns) {
         if (!canBuy(money)) break;
 
         const sym = buyCandidates[i];
-        const [shares, avgPx, sharesShort, avgPxShort] = tix.getPosition(sym);
+        const [shares, , sharesShort] = tix.getPosition(sym);
 
         if (getSymbolPoint(tix, sym) > 0) {
           const amountToBuy =
@@ -143,7 +143,7 @@ export async function main(ns) {
             if (purchasePrice > 0) {
               notify(
                 ns,
-                `Buy ${formatNumber(amountToAfford)} x ${sym} for ${formatCurrency(purchasePrice * amountToAfford)}.`,
+                `Buy ${formatNumber(ns, amountToAfford)} x ${sym} for ${formatCurrency(ns, purchasePrice * amountToAfford)}.`,
                 'trade'
               );
             }
@@ -155,4 +155,3 @@ export async function main(ns) {
     await tix.nextUpdate();
   }
 }
-

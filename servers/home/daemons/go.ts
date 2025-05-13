@@ -1,12 +1,27 @@
+interface GoMove {
+  x: number;
+  y: number;
+}
+
+interface GoConfig {
+  simulations: number; // Number of simulations per move (lower = faster, higher = better)
+  searchDepth: number; // Max steps in each simulation (lower = faster)
+  explorationWeight: number; // UCB exploration parameter
+  sleepBetweenSims: number; // Sleep time (ms) between simulations to prevent freezing
+}
+
 /**
  * Find a move that threatens opponent stones by reducing their liberties
- * @param {NS} ns - Netscript interface
- * @param {string[]} board - Current board state
- * @param {boolean[][]} validMoves - Grid of valid moves
- * @param {number[][]} liberties - Grid of liberty counts
- * @returns {Object|null} Threatening move or null
+ * @param board - Current board state
+ * @param validMoves - Grid of valid moves
+ * @param liberties - Grid of liberty counts
+ * @returns Threatening move or null
  */
-function findThreatMove(ns, board, validMoves, liberties) {
+function findThreatMove(
+  board: string[],
+  validMoves: boolean[][],
+  liberties: number[][]
+): GoMove | null {
   const size = board.length;
 
   // Look for opponent chains with only two liberties
@@ -46,12 +61,14 @@ function findThreatMove(ns, board, validMoves, liberties) {
 
 /**
  * Find a move that expands our territory
- * @param {NS} ns - Netscript interface
- * @param {string[]} board - Current board state
- * @param {boolean[][]} validMoves - Grid of valid moves
- * @returns {Object|null} Territory expansion move or null
+ * @param board - Current board state
+ * @param validMoves - Grid of valid moves
+ * @returns Territory expansion move or null
  */
-function findExpansionMove(ns, board, validMoves) {
+function findExpansionMove(
+  board: string[],
+  validMoves: boolean[][]
+): GoMove | null {
   const size = board.length;
 
   // Choose expansion moves that maximize future liberties
@@ -100,13 +117,18 @@ function findExpansionMove(ns, board, validMoves) {
 
 /**
  * Check if a move would endanger our own chains
- * @param {string[]} board - Current board state
- * @param {number[][]} liberties - Grid of liberty counts
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if the move would endanger our chains
+ * @param board - Current board state
+ * @param liberties - Grid of liberty counts
+ * @param x - X coordinate
+ * @param y - Y coordinate
+ * @returns True if the move would endanger our chains
  */
-function endangersOurChains(board, liberties, x, y) {
+function endangersOurChains(
+  board: string[],
+  liberties: number[][],
+  x: number,
+  y: number
+): boolean {
   const size = board.length;
   const directions = [
     [-1, 0],
@@ -131,15 +153,15 @@ function endangersOurChains(board, liberties, x, y) {
   }
 
   return false;
-} /**
+}
+
+/**
  * Check if there are potential captures that we should pursue
- * @param {NS} ns - Netscript interface
- * @param {string[]} board - Current board state
- * @param {boolean[][]} validMoves - Grid of valid moves
- * @param {number[][]} liberties - Grid of liberty counts
- * @returns {boolean} True if potential captures exist
+ * @param board - Current board state
+ * @param liberties - Grid of liberty counts
+ * @returns True if potential captures exist
  */
-function hasPotentialCaptures(ns, board, validMoves, liberties) {
+function hasPotentialCaptures(board: string[], liberties: number[][]) {
   const size = board.length;
 
   // Look for opponent chains with 2 or fewer liberties
@@ -153,19 +175,20 @@ function hasPotentialCaptures(ns, board, validMoves, liberties) {
   }
 
   return false;
-} /** @param {NS} ns */
-export async function main(ns) {
+}
+
+export async function main(ns: NS) {
   // Disable logs and clear terminal
   ns.disableLog('ALL');
   ns.clearLog();
   ns.print('Lightweight IPvGO MCTS Bot Starting...');
 
   // Config - adjust these parameters to balance performance vs effectiveness
-  const config = {
-    simulations: 50, // Number of simulations per move (lower = faster, higher = better)
-    searchDepth: 5, // Max steps in each simulation (lower = faster)
-    explorationWeight: 1.5, // UCB exploration parameter
-    sleepBetweenSims: 5, // Sleep time (ms) between simulations to prevent freezing
+  const config: GoConfig = {
+    simulations: 50,
+    searchDepth: 5,
+    explorationWeight: 1.5,
+    sleepBetweenSims: 5,
   };
 
   ns.print(`Config: ${JSON.stringify(config)}`);
@@ -173,7 +196,7 @@ export async function main(ns) {
   // Keep playing games continuously
   while (true) {
     // Reset the board for a new game against Netburners with 7x7 grid
-    await ns.go.resetBoardState('Netburners', 7);
+    ns.go.resetBoardState('Netburners', 7);
     ns.print('Starting new game against Netburners on 7x7 grid');
 
     // Play the current game until completion
@@ -186,11 +209,11 @@ export async function main(ns) {
 
 /**
  * Play a single game of IPvGO
- * @param {NS} ns - Netscript interface
- * @param {Object} config - Configuration parameters
+ * @param ns - Netscript interface
+ * @param config - Configuration parameters
  */
-async function playGame(ns, config) {
-  let result;
+async function playGame(ns: NS, config: GoConfig) {
+  let result: GoMove & { type: 'move' | 'pass' | 'gameOver' };
   let moveCount = 0;
 
   let opponentPassed = false;
@@ -203,7 +226,8 @@ async function playGame(ns, config) {
     const board = ns.go.getBoardState();
     const validMoves = ns.go.analysis.getValidMoves();
     const liberties = ns.go.analysis.getLiberties();
-    const stats = ns.go.analysis.getStats();
+    const player = ns.go.getCurrentPlayer();
+    const state = ns.go.getGameState();
 
     // Count pins on the board
     let playerPinCount = 0;
@@ -221,13 +245,16 @@ async function playGame(ns, config) {
     const filledSpaces = playerPinCount + opponentPinCount;
     const boardCoverage = filledSpaces / totalSpaces;
 
+    const playerScore =
+      player === 'White' ? state.whiteScore : state.blackScore;
+    const aiScore = player === 'White' ? state.blackScore : state.whiteScore;
+
     // Check if we should pass based on area scoring principles
     const shouldPass =
       // Only pass if opponent passed AND we've maximized our position
       opponentPassed &&
       // We have a significant score lead and no obvious captures remain
-      ((stats.playerScore > stats.aiScore + 3 &&
-        !hasPotentialCaptures(ns, board, validMoves, liberties)) ||
+      ((playerScore > aiScore + 3 && !hasPotentialCaptures(board, liberties)) ||
         // Opponent has no pins left (complete victory)
         opponentPinCount === 0 ||
         // Very late game with substantial advantage
@@ -235,7 +262,7 @@ async function playGame(ns, config) {
 
     if (shouldPass) {
       ns.print(
-        `Passing to secure win - Player: ${stats.playerScore}, Opponent: ${stats.aiScore}, Coverage: ${Math.round(boardCoverage * 100)}%`
+        `Passing to secure win - Player: ${playerScore}, Opponent: ${aiScore}, Coverage: ${Math.round(boardCoverage * 100)}%`
       );
       result = await ns.go.passTurn();
     } else {
@@ -272,48 +299,56 @@ async function playGame(ns, config) {
   } while (result?.type !== 'gameOver');
 
   // Game stats
-  const stats = ns.go.analysis.getStats();
-  ns.print(
-    `Game finished! Score - You: ${stats.playerScore}, Opponent: ${stats.aiScore}`
-  );
-  return stats;
+  const player = ns.go.getCurrentPlayer();
+  const state = ns.go.getGameState();
+  const playerScore = player === 'White' ? state.whiteScore : state.blackScore;
+  const aiScore = player === 'White' ? state.blackScore : state.whiteScore;
+  ns.print(`Game finished! Score - You: ${playerScore}, Opponent: ${aiScore}`);
+
+  return state;
 }
 
 /**
  * Find the best move using a lightweight MCTS implementation
- * @param {NS} ns - Netscript interface
- * @param {string[]} board - Current board state
- * @param {boolean[][]} validMoves - Grid of valid moves
- * @param {number[][]} liberties - Grid of liberty counts
- * @param {Object} config - Configuration parameters
- * @returns {Object|null} The best move as {x, y} or null to pass
+ * @param ns - Netscript interface
+ * @param board - Current board state
+ * @param validMoves - Grid of valid moves
+ * @param liberties - Grid of liberty counts
+ * @param config - Configuration parameters
+ * @returns The best move as {x, y} or null to pass
  */
-async function findBestMove(ns, board, validMoves, liberties, config) {
+async function findBestMove(
+  ns: NS,
+  board: string[],
+  validMoves: boolean[][],
+  liberties: number[][],
+  config: GoConfig
+): Promise<GoMove | null> {
   // First, try to make critical moves without using MCTS
 
   // 1. Check if we can capture an opponent's chain
-  const captureMove = findCaptureMove(ns, board, validMoves, liberties);
+  const captureMove = findCaptureMove(board, validMoves, liberties);
   if (captureMove) {
     ns.print('Found capture move!');
     return captureMove;
   }
 
   // 2. Check if we need to defend one of our chains
-  const defendMove = findDefendMove(ns, board, validMoves, liberties);
+  const defendMove = findDefendMove(board, validMoves, liberties);
   if (defendMove) {
     ns.print('Found defensive move!');
     return defendMove;
   }
 
   // 3. Check for near-capture moves (opponent chains with 2 liberties)
-  const threatMove = findThreatMove(ns, board, validMoves, liberties);
+  const threatMove = findThreatMove(board, validMoves, liberties);
   if (threatMove) {
     ns.print("Found threatening move to reduce opponent's liberties!");
     return threatMove;
   }
 
   // 4. Check for territory expansion
-  const expansionMove = findExpansionMove(ns, board, validMoves);
+  const expansionMove = findExpansionMove(board, validMoves);
   if (expansionMove) {
     ns.print('Found territory expansion move!');
     return expansionMove;
@@ -349,7 +384,7 @@ async function findBestMove(ns, board, validMoves, liberties, config) {
     const key = `${move.x},${move.y}`;
 
     // Run a simulation for this move
-    const win = await simulateGame(ns, board, move, config.searchDepth);
+    const win = simulateGame(board, move);
 
     // Update move statistics
     moveStats[key].visits++;
@@ -383,13 +418,18 @@ async function findBestMove(ns, board, validMoves, liberties, config) {
 
 /**
  * Select a move using UCB formula
- * @param {Array} moves - List of valid moves
- * @param {Object} moveStats - Statistics for each move
- * @param {number} explorationWeight - UCB exploration parameter
- * @param {number} simulationNum - Current simulation number
- * @returns {Object} Selected move
+ * @param moves - List of valid moves
+ * @param moveStats - Statistics for each move
+ * @param explorationWeight - UCB exploration parameter
+ * @param simulationNum - Current simulation number
+ * @returns Selected move
  */
-function selectMoveUCB(moves, moveStats, explorationWeight, simulationNum) {
+function selectMoveUCB(
+  moves: Array<any>,
+  moveStats: object,
+  explorationWeight: number,
+  simulationNum: number
+): GoMove {
   // Use pure exploration for the first moves to ensure all moves are tried
   if (simulationNum < moves.length) {
     return moves[simulationNum];
@@ -411,7 +451,7 @@ function selectMoveUCB(moves, moveStats, explorationWeight, simulationNum) {
     const stats = moveStats[key];
 
     // Calculate UCB score
-    let ucb;
+    let ucb: number;
     if (stats.visits === 0) {
       ucb = Infinity; // Ensure unvisited nodes are tried
     } else {
@@ -432,13 +472,16 @@ function selectMoveUCB(moves, moveStats, explorationWeight, simulationNum) {
 
 /**
  * Find a move that can capture an opponent's chain
- * @param {NS} ns - Netscript interface
- * @param {string[]} board - Current board state
- * @param {boolean[][]} validMoves - Grid of valid moves
- * @param {number[][]} liberties - Grid of liberty counts
- * @returns {Object|null} Capture move or null
+ * @param board - Current board state
+ * @param validMoves - Grid of valid moves
+ * @param liberties - Grid of liberty counts
+ * @returns Capture move or null
  */
-function findCaptureMove(ns, board, validMoves, liberties) {
+function findCaptureMove(
+  board: string[],
+  validMoves: boolean[][],
+  liberties: number[][]
+): GoMove | null {
   const size = board.length;
 
   // Look for opponent chains with only one liberty
@@ -475,13 +518,16 @@ function findCaptureMove(ns, board, validMoves, liberties) {
 
 /**
  * Find a move to defend one of our threatened chains
- * @param {NS} ns - Netscript interface
  * @param {string[]} board - Current board state
  * @param {boolean[][]} validMoves - Grid of valid moves
  * @param {number[][]} liberties - Grid of liberty counts
  * @returns {Object|null} Defensive move or null
  */
-function findDefendMove(ns, board, validMoves, liberties) {
+function findDefendMove(
+  board: string[],
+  validMoves: boolean[][],
+  liberties: number[][]
+): GoMove | null {
   const size = board.length;
 
   // Look for our chains with only one liberty
@@ -518,13 +564,11 @@ function findDefendMove(ns, board, validMoves, liberties) {
 
 /**
  * Simulate a random game from a given move
- * @param {NS} ns - Netscript interface
- * @param {string[]} board - Current board state
- * @param {Object} firstMove - First move to make
- * @param {number} maxDepth - Maximum simulation depth
- * @returns {number} Score between 0 and 1, higher is better
+ * @param board - Current board state
+ * @param firstMove - First move to make
+ * @returns Score between 0 and 1, higher is better
  */
-async function simulateGame(ns, board, firstMove, maxDepth) {
+function simulateGame(board: string[], firstMove: GoMove): number {
   const x = firstMove.x;
   const y = firstMove.y;
   const size = board.length;
@@ -583,12 +627,16 @@ async function simulateGame(ns, board, firstMove, maxDepth) {
 
 /**
  * Check if a move reduces opponent's liberties
- * @param {string[]} board - Current board state
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if it reduces opponent liberties
+ * @param board - Current board state
+ * @param x - X coordinate
+ * @param  y - Y coordinate
+ * @returns True if it reduces opponent liberties
  */
-function reducesOpponentLiberties(board, x, y) {
+function reducesOpponentLiberties(
+  board: string[],
+  x: number,
+  y: number
+): boolean {
   const size = board.length;
   const directions = [
     [-1, 0],
@@ -614,12 +662,12 @@ function reducesOpponentLiberties(board, x, y) {
 
 /**
  * Check if a move would capture opponent stones
- * @param {string[]} board - Current board state
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if capturing
+ * @param board - Current board state
+ * @param x - X coordinate
+ * @param y - Y coordinate
+ * @returns True if capturing
  */
-function isCapturingMove(board, x, y) {
+function isCapturingMove(board: string[], x: number, y: number): boolean {
   const size = board.length;
   const directions = [
     [-1, 0],
@@ -648,26 +696,13 @@ function isCapturingMove(board, x, y) {
 }
 
 /**
- * Check if a move increases our liberties
- * @param {string[]} board - Current board state
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if it increases liberties
- */
-function increasesLiberties(board, x, y) {
-  // Simplified check - in a real implementation, you would calculate
-  // if connecting to our stones increases the total liberties
-  return true;
-}
-
-/**
  * Check if a move expands our territory by connecting to existing stones
- * @param {string[]} board - Current board state
- * @param {number} x - X coordinate
- * @param {number} y - Y coordinate
- * @returns {boolean} True if it's an expanding move
+ * @param board - Current board state
+ * @param x - X coordinate
+ * @param y - Y coordinate
+ * @returns True if it's an expanding move
  */
-function isExpandingMove(board, x, y) {
+function isExpandingMove(board: string[], x: number, y: number): boolean {
   const size = board.length;
   const directions = [
     [-1, 0],
@@ -692,4 +727,3 @@ function isExpandingMove(board, x, y) {
 
   return false;
 }
-

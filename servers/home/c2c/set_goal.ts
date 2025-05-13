@@ -3,11 +3,14 @@ import { GOAL_PORT } from '../helpers/ports';
 const GOALS = ['hack', 'ddos', 'share'];
 
 /**
- * @param {AutocompleteData} data - context about the game, useful when autocompleting
- * @param {string[]} args - current arguments, not including "run script.js"
- * @returns {string[]} - the array of possible autocomplete options
+ * @param _data - context about the game, useful when autocompleting
+ * @param args - current arguments, not including "run script.js"
+ * @returns - the array of possible autocomplete options
  */
-export function autocomplete(data, args) {
+export function autocomplete(
+  _data: AutocompleteData,
+  args: string[]
+): string[] {
   if (args[0]) {
     return GOALS.filter((goal) => goal.startsWith(args[0]));
   }
@@ -16,10 +19,10 @@ export function autocomplete(data, args) {
 }
 
 /** @param {NS} ns */
-export async function main(ns) {
+export async function main(ns: NS) {
   const args = ns.flags([['help', false]]);
 
-  if (args.help || args._.length < 1) {
+  if (args.help || ns.args.length < 1) {
     ns.tprint('Choose between botnet functions (' + GOALS.join('/') + ')');
     ns.tprint(`Usage: run ${ns.getScriptName()} FUNCTIONS`);
     ns.tprint('Example:');
