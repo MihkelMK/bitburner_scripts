@@ -1,53 +1,604 @@
+import { disable_logs, notify } from '../helpers/cli';
+
 interface GoMove {
   x: number;
   y: number;
 }
 
 interface GoConfig {
-  simulations: number; // Number of simulations per move (lower = faster, higher = better)
-  searchDepth: number; // Max steps in each simulation (lower = faster)
-  explorationWeight: number; // UCB exploration parameter
-  sleepBetweenSims: number; // Sleep time (ms) between simulations to prevent freezing
+  simulations: number;
+  searchDepth: number;
+  explorationWeight: number;
+  sleepBetweenSims: number;
+  useTerritory: boolean;
+  usePatterns: boolean;
+}
+
+/**
+ * Gets all stones in a connected group and counts its unique liberties.
+ */
+function getGroupAndLiberties(
+  board: string[],
+  startX: number,
+  startY: number,
+  player: string | null = null
+): { stones: GoMove[]; liberties: GoMove[]; uniqueLiberties: number } | null {
+  const R = board.length;
+  const C = board[0].length;
+  const groupPlayer = player || board[startX][startY];
+
+  if (
+    groupPlayer === '.' ||
+    startX < 0 ||
+    startX >= R ||
+    startY < 0 ||
+    startY >= C
+  ) {
+    return null;
+  }
+  if (board[startX][startY] !== groupPlayer && player !== null) {
+    return null;
+  }
+
+  const q: GoMove[] = [{ x: startX, y: startY }];
+  const visitedStones: boolean[][] = Array(R)
+    .fill(null)
+    .map(() => Array(C).fill(false));
+  const groupStones: GoMove[] = [];
+  const libertyPoints: GoMove[] = [];
+  const libertySet = new Set<string>();
+
+  visitedStones[startX][startY] = true;
+
+  let head = 0;
+  while (head < q.length) {
+    const { x, y } = q[head++];
+    groupStones.push({ x, y });
+
+    const directions = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+    for (const [dx, dy] of directions) {
+      const nx = x + dx;
+      const ny = y + dy;
+
+      if (nx >= 0 && nx < R && ny >= 0 && ny < C) {
+        if (board[nx][ny] === '.') {
+          const libertyKey = `${nx},${ny}`;
+          if (!libertySet.has(libertyKey)) {
+            libertySet.add(libertyKey);
+            libertyPoints.push({ x: nx, y: ny });
+          }
+        } else if (board[nx][ny] === groupPlayer && !visitedStones[nx][ny]) {
+          visitedStones[nx][ny] = true;
+          q.push({ x: nx, y: ny });
+        }
+      }
+    }
+  }
+  return {
+    stones: groupStones,
+    liberties: libertyPoints,
+    uniqueLiberties: libertySet.size,
+  };
+}
+
+/**
+ * Checks if a move by playerToMove at (x,y) captures any opponent groups.
+ */
+function checkActualCaptures(
+  board: string[],
+  x: number,
+  y: number,
+  playerToMove: 'X' | 'O'
+): { captured: boolean; capturedGroups: GoMove[][] } {
+  const R = board.length;
+  const C = board[0].length;
+  const opponentPlayer = playerToMove === 'X' ? 'O' : 'X';
+  let capturedAny = false;
+  const allCapturedGroups: GoMove[][] = [];
+
+  // Create a temporary board with the new move
+  const tempBoardWithMove = board.map((row, rIdx) =>
+    rIdx === x ? row.substring(0, y) + playerToMove + row.substring(y + 1) : row
+  );
+
+  const directions = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
+  const checkedOpponentGroups = new Set<string>();
+
+  for (const [dx, dy] of directions) {
+    const adjX = x + dx;
+    const adjY = y + dy;
+
+    if (
+      adjX >= 0 &&
+      adjX < R &&
+      adjY >= 0 &&
+      adjY < C &&
+      tempBoardWithMove[adjX][adjY] === opponentPlayer
+    ) {
+      const groupInfo = getGroupAndLiberties(
+        tempBoardWithMove,
+        adjX,
+        adjY,
+        opponentPlayer
+      );
+      if (groupInfo && groupInfo.uniqueLiberties === 0) {
+        const groupKey = groupInfo.stones
+          .map((s) => `${s.x},${s.y}`)
+          .sort()
+          .join('-');
+        if (!checkedOpponentGroups.has(groupKey)) {
+          capturedAny = true;
+          allCapturedGroups.push(groupInfo.stones);
+          checkedOpponentGroups.add(groupKey);
+        }
+      }
+    }
+  }
+  return { captured: capturedAny, capturedGroups: allCapturedGroups };
+}
+
+/**
+ * Checks if a move is a "bad" self-atari.
+ */
+function isBadSelfAtari(
+  board: string[],
+  x: number,
+  y: number,
+  playerToMove: 'X' | 'O'
+): boolean {
+  // Create a board with our move placed
+  const boardWithOurMove = board.map((row, rIdx) =>
+    rIdx === x ? row.substring(0, y) + playerToMove + row.substring(y + 1) : row
+  );
+
+  const groupInfoAfterOurMove = getGroupAndLiberties(
+    boardWithOurMove,
+    x,
+    y,
+    playerToMove
+  );
+
+  if (groupInfoAfterOurMove && groupInfoAfterOurMove.uniqueLiberties === 1) {
+    // Our group is in atari. Is it bad?
+    const captureDetails = checkActualCaptures(board, x, y, playerToMove);
+
+    if (!captureDetails.captured) {
+      return true; // Self-atari without making any captures. Definitely bad.
+    } else {
+      // It's self-atari AND a capture. Check if the atari resolves after captures.
+      let boardAfterCaptures = board.map((r, rIdx) =>
+        rIdx === x ? r.substring(0, y) + playerToMove + r.substring(y + 1) : r
+      );
+      captureDetails.capturedGroups.forEach((group) => {
+        group.forEach((stone) => {
+          boardAfterCaptures[stone.x] =
+            boardAfterCaptures[stone.x].substring(0, stone.y) +
+            '.' +
+            boardAfterCaptures[stone.x].substring(stone.y + 1);
+        });
+      });
+
+      const groupInfoOnBoardAfterCaptures = getGroupAndLiberties(
+        boardAfterCaptures,
+        x,
+        y,
+        playerToMove
+      );
+      if (
+        groupInfoOnBoardAfterCaptures &&
+        groupInfoOnBoardAfterCaptures.uniqueLiberties === 1
+      ) {
+        return true; // Still in atari even after captures (e.g., snapback). Bad.
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Applies a move to the board, resolves captures, and checks for basic suicide.
+ */
+function applyMoveAndResolveCaptures(
+  boardBeforeMove: string[],
+  move: GoMove,
+  player: 'X' | 'O'
+): string[] | null {
+  let newBoard = boardBeforeMove.map((row) => row);
+  const R = newBoard.length;
+  const C = newBoard[0].length;
+
+  if (
+    move.x < 0 ||
+    move.x >= R ||
+    move.y < 0 ||
+    move.y >= C ||
+    newBoard[move.x][move.y] !== '.'
+  ) {
+    return null;
+  }
+
+  newBoard[move.x] =
+    newBoard[move.x].substring(0, move.y) +
+    player +
+    newBoard[move.x].substring(move.y + 1);
+
+  const captureDetails = checkActualCaptures(
+    boardBeforeMove,
+    move.x,
+    move.y,
+    player
+  );
+
+  if (captureDetails.captured) {
+    captureDetails.capturedGroups.forEach((group) => {
+      group.forEach((stone) => {
+        newBoard[stone.x] =
+          newBoard[stone.x].substring(0, stone.y) +
+          '.' +
+          newBoard[stone.x].substring(stone.y + 1);
+      });
+    });
+  } else {
+    const groupInfoOfPlacedStone = getGroupAndLiberties(
+      newBoard,
+      move.x,
+      move.y,
+      player
+    );
+    if (
+      groupInfoOfPlacedStone &&
+      groupInfoOfPlacedStone.uniqueLiberties === 0
+    ) {
+      return null;
+    }
+  }
+  return newBoard;
+}
+
+/**
+ * Gets valid moves for a player on a given board state during simulation.
+ */
+function getValidMovesForSimulation(
+  currentSimBoard: string[],
+  playerForThisTurn: 'X' | 'O',
+  R: number,
+  C: number
+): GoMove[] {
+  const moves: GoMove[] = [];
+  for (let r = 0; r < R; r++) {
+    for (let c = 0; c < C; c++) {
+      if (currentSimBoard[r][c] === '.') {
+        const boardAfterHypotheticalMove = applyMoveAndResolveCaptures(
+          currentSimBoard,
+          { x: r, y: c },
+          playerForThisTurn
+        );
+        if (boardAfterHypotheticalMove !== null) {
+          moves.push({ x: r, y: c });
+        }
+      }
+    }
+  }
+  return moves;
 }
 
 /**
  * Find a move that threatens opponent stones by reducing their liberties
- * @param board - Current board state
- * @param validMoves - Grid of valid moves
- * @param liberties - Grid of liberty counts
- * @returns Threatening move or null
  */
 function findThreatMove(
   board: string[],
-  validMoves: boolean[][],
-  liberties: number[][]
+  validMoves: boolean[][]
 ): GoMove | null {
   const size = board.length;
+  const playerChar = 'X';
 
-  // Look for opponent chains with only two liberties
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      // Check if this is an opponent's piece with exactly 2 liberties
-      if (board[x][y] === 'O' && liberties[x][y] === 2) {
-        // Find one of the liberty positions by checking adjacent points
-        const directions = [
-          [-1, 0],
-          [1, 0],
-          [0, -1],
-          [0, 1],
-        ];
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] === 'O') {
+        const groupInfo = getGroupAndLiberties(board, r, c, 'O');
+        if (groupInfo && groupInfo.uniqueLiberties === 2) {
+          for (const lib of groupInfo.liberties) {
+            if (validMoves[lib.x][lib.y]) {
+              if (!isBadSelfAtari(board, lib.x, lib.y, playerChar)) {
+                return { x: lib.x, y: lib.y };
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
 
-        for (const [dx, dy] of directions) {
-          const nx = x + dx;
-          const ny = y + dy;
+/**
+ * NEW: Estimate territory control for evaluating board positions
+ * @returns An array with scores for each player's territory
+ */
+function estimateTerritory(board: string[]): { X: number; O: number } {
+  const size = board.length;
+  const visited: boolean[][] = Array(size)
+    .fill(null)
+    .map(() => Array(size).fill(false));
+  const territory = { X: 0, O: 0 };
 
-          // Check bounds
-          if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-            // Check if this is an empty point and a valid move
-            if (board[nx][ny] === '.' && validMoves[nx][ny]) {
-              // Make sure this move doesn't endanger our own chains
-              if (!endangersOurChains(board, liberties, nx, ny)) {
-                return { x: nx, y: ny };
+  // For each empty point, determine if it's surrounded by one player
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] === '.' && !visited[r][c]) {
+        const emptyGroup = floodFillEmptySpace(board, r, c, visited);
+        const surroundingPlayers = checkSurroundingPlayers(board, emptyGroup);
+
+        // If surrounded by only one player, it's that player's territory
+        if (surroundingPlayers.X && !surroundingPlayers.O) {
+          territory.X += emptyGroup.length;
+        } else if (!surroundingPlayers.X && surroundingPlayers.O) {
+          territory.O += emptyGroup.length;
+        }
+      }
+    }
+  }
+
+  return territory;
+}
+
+/**
+ * Flood fill to find connected empty points
+ */
+function floodFillEmptySpace(
+  board: string[],
+  startX: number,
+  startY: number,
+  visited: boolean[][]
+): GoMove[] {
+  const size = board.length;
+  const emptyGroup: GoMove[] = [];
+  const queue: GoMove[] = [{ x: startX, y: startY }];
+  visited[startX][startY] = true;
+
+  while (queue.length > 0) {
+    const { x, y } = queue.shift()!;
+    emptyGroup.push({ x, y });
+
+    const directions = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+    for (const [dx, dy] of directions) {
+      const nx = x + dx;
+      const ny = y + dy;
+
+      if (
+        nx >= 0 &&
+        nx < size &&
+        ny >= 0 &&
+        ny < size &&
+        board[nx][ny] === '.' &&
+        !visited[nx][ny]
+      ) {
+        visited[nx][ny] = true;
+        queue.push({ x: nx, y: ny });
+      }
+    }
+  }
+
+  return emptyGroup;
+}
+
+/**
+ * Check which players surround an empty group
+ */
+function checkSurroundingPlayers(
+  board: string[],
+  emptyGroup: GoMove[]
+): { X: boolean; O: boolean } {
+  const size = board.length;
+  const surrounding = { X: false, O: false };
+
+  for (const { x, y } of emptyGroup) {
+    const directions = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+    for (const [dx, dy] of directions) {
+      const nx = x + dx;
+      const ny = y + dy;
+
+      if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+        if (board[nx][ny] === 'X') {
+          surrounding.X = true;
+        } else if (board[nx][ny] === 'O') {
+          surrounding.O = true;
+        }
+      }
+    }
+  }
+
+  return surrounding;
+}
+
+/**
+ * NEW: Evaluate how good a board position is for a player
+ */
+function evaluateBoard(
+  board: string[],
+  playerToMove: 'X' | 'O',
+  useTerritory: boolean = true
+): number {
+  const R = board.length;
+  const C = board[0].length;
+  const opponent = playerToMove === 'X' ? 'O' : 'X';
+
+  // Count stones
+  let playerStones = 0;
+  let opponentStones = 0;
+  for (let r = 0; r < R; r++) {
+    for (let c = 0; c < C; c++) {
+      if (board[r][c] === playerToMove) playerStones++;
+      else if (board[r][c] === opponent) opponentStones++;
+    }
+  }
+
+  // Add territory evaluation
+  let score = playerStones - opponentStones;
+
+  if (useTerritory) {
+    const territory = estimateTerritory(board);
+    score +=
+      playerToMove === 'X'
+        ? territory.X - territory.O
+        : territory.O - territory.X;
+
+    // Also consider liberties (breathing space)
+    let playerLiberties = 0;
+    let opponentLiberties = 0;
+    const visitedPlayer: boolean[][] = Array(R)
+      .fill(null)
+      .map(() => Array(C).fill(false));
+    const visitedOpponent: boolean[][] = Array(R)
+      .fill(null)
+      .map(() => Array(C).fill(false));
+
+    for (let r = 0; r < R; r++) {
+      for (let c = 0; c < C; c++) {
+        if (board[r][c] === playerToMove && !visitedPlayer[r][c]) {
+          const group = getGroupAndLiberties(board, r, c, playerToMove);
+          if (group) {
+            playerLiberties += group.uniqueLiberties;
+            group.stones.forEach(
+              (stone) => (visitedPlayer[stone.x][stone.y] = true)
+            );
+          }
+        } else if (board[r][c] === opponent && !visitedOpponent[r][c]) {
+          const group = getGroupAndLiberties(board, r, c, opponent);
+          if (group) {
+            opponentLiberties += group.uniqueLiberties;
+            group.stones.forEach(
+              (stone) => (visitedOpponent[stone.x][stone.y] = true)
+            );
+          }
+        }
+      }
+    }
+
+    // Add liberty difference to score with a smaller weight
+    score += (playerLiberties - opponentLiberties) * 0.2;
+  }
+
+  return score;
+}
+
+/**
+ * NEW: Check if a move matches strategic patterns
+ */
+function matchesPattern(
+  board: string[],
+  x: number,
+  y: number,
+  playerChar: 'X' | 'O'
+): boolean {
+  const size = board.length;
+
+  // Pattern 1: 3-3 point (corner approach)
+  if (
+    (x === 2 && y === 2) ||
+    (x === 2 && y === size - 3) ||
+    (x === size - 3 && y === 2) ||
+    (x === size - 3 && y === size - 3)
+  ) {
+    return true;
+  }
+
+  // Pattern 2: Star point for larger boards
+  if (
+    size >= 9 &&
+    ((x === 4 && y === 4) ||
+      (x === 4 && y === size - 5) ||
+      (x === size - 5 && y === 4) ||
+      (x === size - 5 && y === size - 5))
+  ) {
+    return true;
+  }
+
+  // Pattern 3: Knight's move from our stone
+  const directions = [
+    [-2, -1],
+    [-2, 1],
+    [-1, -2],
+    [-1, 2],
+    [1, -2],
+    [1, 2],
+    [2, -1],
+    [2, 1],
+  ];
+
+  for (const [dx, dy] of directions) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (
+      nx >= 0 &&
+      nx < size &&
+      ny >= 0 &&
+      ny < size &&
+      board[nx][ny] === playerChar
+    ) {
+      return true;
+    }
+  }
+
+  // Pattern 4: Enclosure of corner
+  if (
+    (x <= 2 && y <= 2) ||
+    (x <= 2 && y >= size - 3) ||
+    (x >= size - 3 && y <= 2) ||
+    (x >= size - 3 && y >= size - 3)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * NEW: Calculate influence map to evaluate territory control
+ */
+function calculateInfluence(board: string[]): number[][] {
+  const size = board.length;
+  const influence = Array(size)
+    .fill(0)
+    .map(() => Array(size).fill(0));
+
+  // For each stone, spread its influence
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] !== '.') {
+        const stone = board[r][c];
+        const stoneValue = stone === 'X' ? 1 : -1;
+
+        // Influence decreases with distance
+        for (let dr = -3; dr <= 3; dr++) {
+          for (let dc = -3; dc <= 3; dc++) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+              const distance = Math.abs(dr) + Math.abs(dc);
+              if (distance <= 3) {
+                const value = (stoneValue * (4 - distance)) / 3;
+                influence[nr][nc] += value;
               }
             }
           }
@@ -56,414 +607,79 @@ function findThreatMove(
     }
   }
 
-  return null;
+  return influence;
 }
 
 /**
- * Find a move that expands our territory
- * @param board - Current board state
- * @param validMoves - Grid of valid moves
- * @returns Territory expansion move or null
+ * Find a move that expands our territory using influence map
  */
 function findExpansionMove(
   board: string[],
   validMoves: boolean[][]
 ): GoMove | null {
   const size = board.length;
+  const playerChar = 'X';
+  let bestMove: GoMove | null = null;
+  let maxScore = -Infinity;
 
-  // Choose expansion moves that maximize future liberties
-  // Try to find a move that connects to our existing chains and has multiple empty neighbors
-  let bestMove = null;
-  let maxEmptyNeighbors = -1;
+  // Calculate influence map
+  const influence = calculateInfluence(board);
 
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      if (validMoves[x][y]) {
-        // Check if this move is adjacent to our existing stones
-        const directions = [
-          [-1, 0],
-          [1, 0],
-          [0, -1],
-          [0, 1],
-        ];
-        let adjacentToOurs = false;
-        let emptyNeighbors = 0;
+  // Strategic value of board positions - corners and edges are worth more
+  const strategicValue: number[][] = Array(size)
+    .fill(0)
+    .map(() => Array(size).fill(1));
 
-        for (const [dx, dy] of directions) {
-          const nx = x + dx;
-          const ny = y + dy;
+  // Boost corners and edges
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      // Corner bonus
+      if (
+        (r <= 1 && c <= 1) ||
+        (r <= 1 && c >= size - 2) ||
+        (r >= size - 2 && c <= 1) ||
+        (r >= size - 2 && c >= size - 2)
+      ) {
+        strategicValue[r][c] = 2.0;
+      }
+      // Edge bonus
+      else if (r <= 1 || r >= size - 2 || c <= 1 || c >= size - 2) {
+        strategicValue[r][c] = 1.5;
+      }
+    }
+  }
 
-          // Check bounds
-          if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-            if (board[nx][ny] === 'X') {
-              adjacentToOurs = true;
-            } else if (board[nx][ny] === '.') {
-              emptyNeighbors++;
-            }
-          }
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (validMoves[r][c] && !isBadSelfAtari(board, r, c, playerChar)) {
+        // Calculate move score based on influence, strategic value, and pattern matching
+        let moveScore = influence[r][c] * 0.5; // We want to play where we have influence
+
+        // Boost strategic areas
+        moveScore *= strategicValue[r][c];
+
+        // Bonus for pattern matching
+        if (matchesPattern(board, r, c, playerChar)) {
+          moveScore += 1.0;
         }
 
-        // If adjacent to our stones and has more empty neighbors than current best
-        if (adjacentToOurs && emptyNeighbors > maxEmptyNeighbors) {
-          maxEmptyNeighbors = emptyNeighbors;
-          bestMove = { x, y };
+        // Check if this move extends our groups' liberties
+        const tempBoard = board.map((row, i) =>
+          i === r
+            ? row.substring(0, c) + playerChar + row.substring(c + 1)
+            : row
+        );
+        const group = getGroupAndLiberties(tempBoard, r, c, playerChar);
+
+        if (group) {
+          moveScore += group.uniqueLiberties * 0.3;
+        }
+
+        if (moveScore > maxScore) {
+          maxScore = moveScore;
+          bestMove = { x: r, y: c };
         }
       }
-    }
-  }
-
-  return bestMove;
-}
-
-/**
- * Check if a move would endanger our own chains
- * @param board - Current board state
- * @param liberties - Grid of liberty counts
- * @param x - X coordinate
- * @param y - Y coordinate
- * @returns True if the move would endanger our chains
- */
-function endangersOurChains(
-  board: string[],
-  liberties: number[][],
-  x: number,
-  y: number
-): boolean {
-  const size = board.length;
-  const directions = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
-
-  // Check if this move would reduce any of our chains to 1 liberty
-  for (const [dx, dy] of directions) {
-    const nx = x + dx;
-    const ny = y + dy;
-
-    // Check bounds
-    if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-      // If adjacent to our stone with only 2 liberties
-      // (would become 1 liberty after our move)
-      if (board[nx][ny] === 'X' && liberties[nx][ny] === 2) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Check if there are potential captures that we should pursue
- * @param board - Current board state
- * @param liberties - Grid of liberty counts
- * @returns True if potential captures exist
- */
-function hasPotentialCaptures(board: string[], liberties: number[][]) {
-  const size = board.length;
-
-  // Look for opponent chains with 2 or fewer liberties
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      // Check if this is an opponent's piece with 2 or fewer liberties
-      if (board[x][y] === 'O' && liberties[x][y] <= 2) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-export async function main(ns: NS) {
-  // Disable logs and clear terminal
-  ns.disableLog('ALL');
-  ns.clearLog();
-  ns.print('Lightweight IPvGO MCTS Bot Starting...');
-
-  // Config - adjust these parameters to balance performance vs effectiveness
-  const config: GoConfig = {
-    simulations: 50,
-    searchDepth: 5,
-    explorationWeight: 1.5,
-    sleepBetweenSims: 5,
-  };
-
-  ns.print(`Config: ${JSON.stringify(config)}`);
-
-  // Keep playing games continuously
-  while (true) {
-    // Reset the board for a new game against Netburners with 7x7 grid
-    ns.go.resetBoardState('Netburners', 7);
-    ns.print('Starting new game against Netburners on 7x7 grid');
-
-    // Play the current game until completion
-    await playGame(ns, config);
-
-    // Wait before starting a new game
-    await ns.sleep(1000);
-  }
-}
-
-/**
- * Play a single game of IPvGO
- * @param ns - Netscript interface
- * @param config - Configuration parameters
- */
-async function playGame(ns: NS, config: GoConfig) {
-  let result: GoMove & { type: 'move' | 'pass' | 'gameOver' };
-  let moveCount = 0;
-
-  let opponentPassed = false;
-
-  do {
-    moveCount++;
-    ns.print(`Turn ${moveCount}`);
-
-    // Get the current board state and valid moves
-    const board = ns.go.getBoardState();
-    const validMoves = ns.go.analysis.getValidMoves();
-    const liberties = ns.go.analysis.getLiberties();
-    const player = ns.go.getCurrentPlayer();
-    const state = ns.go.getGameState();
-
-    // Count pins on the board
-    let playerPinCount = 0;
-    let opponentPinCount = 0;
-    for (const column of board) {
-      for (const cell of column) {
-        if (cell === 'X') playerPinCount++;
-        else if (cell === 'O') opponentPinCount++;
-      }
-    }
-
-    // Calculate empty spaces and board coverage
-    const boardSize = board.length;
-    const totalSpaces = boardSize * boardSize;
-    const filledSpaces = playerPinCount + opponentPinCount;
-    const boardCoverage = filledSpaces / totalSpaces;
-
-    const playerScore =
-      player === 'White' ? state.whiteScore : state.blackScore;
-    const aiScore = player === 'White' ? state.blackScore : state.whiteScore;
-
-    // Check if we should pass based on area scoring principles
-    const shouldPass =
-      // Only pass if opponent passed AND we've maximized our position
-      opponentPassed &&
-      // We have a significant score lead and no obvious captures remain
-      ((playerScore > aiScore + 3 && !hasPotentialCaptures(board, liberties)) ||
-        // Opponent has no pins left (complete victory)
-        opponentPinCount === 0 ||
-        // Very late game with substantial advantage
-        (boardCoverage > 0.9 && playerPinCount > opponentPinCount * 2));
-
-    if (shouldPass) {
-      ns.print(
-        `Passing to secure win - Player: ${playerScore}, Opponent: ${aiScore}, Coverage: ${Math.round(boardCoverage * 100)}%`
-      );
-      result = await ns.go.passTurn();
-    } else {
-      // Find best move using simplified MCTS
-      const move = await findBestMove(ns, board, validMoves, liberties, config);
-
-      // Make the selected move or pass if no moves are available
-      if (move) {
-        ns.print(`Playing move at [${move.x}, ${move.y}]`);
-        result = await ns.go.makeMove(move.x, move.y);
-      } else {
-        ns.print('Passing turn - no good moves available');
-        result = await ns.go.passTurn();
-      }
-    }
-
-    // Track if opponent passed
-    opponentPassed = result.type === 'pass';
-
-    // Log opponent's response
-    if (result.type === 'move') {
-      ns.print(`Opponent played at [${result.x}, ${result.y}]`);
-    } else if (result.type === 'pass') {
-      ns.print('Opponent passed their turn');
-    } else if (result.type === 'gameOver') {
-      ns.print('Game over!');
-    }
-
-    // Wait for opponent's next turn
-    await ns.go.opponentNextTurn();
-
-    // Add a small delay between moves
-    await ns.sleep(200);
-  } while (result?.type !== 'gameOver');
-
-  // Game stats
-  const player = ns.go.getCurrentPlayer();
-  const state = ns.go.getGameState();
-  const playerScore = player === 'White' ? state.whiteScore : state.blackScore;
-  const aiScore = player === 'White' ? state.blackScore : state.whiteScore;
-  ns.print(`Game finished! Score - You: ${playerScore}, Opponent: ${aiScore}`);
-
-  return state;
-}
-
-/**
- * Find the best move using a lightweight MCTS implementation
- * @param ns - Netscript interface
- * @param board - Current board state
- * @param validMoves - Grid of valid moves
- * @param liberties - Grid of liberty counts
- * @param config - Configuration parameters
- * @returns The best move as {x, y} or null to pass
- */
-async function findBestMove(
-  ns: NS,
-  board: string[],
-  validMoves: boolean[][],
-  liberties: number[][],
-  config: GoConfig
-): Promise<GoMove | null> {
-  // First, try to make critical moves without using MCTS
-
-  // 1. Check if we can capture an opponent's chain
-  const captureMove = findCaptureMove(board, validMoves, liberties);
-  if (captureMove) {
-    ns.print('Found capture move!');
-    return captureMove;
-  }
-
-  // 2. Check if we need to defend one of our chains
-  const defendMove = findDefendMove(board, validMoves, liberties);
-  if (defendMove) {
-    ns.print('Found defensive move!');
-    return defendMove;
-  }
-
-  // 3. Check for near-capture moves (opponent chains with 2 liberties)
-  const threatMove = findThreatMove(board, validMoves, liberties);
-  if (threatMove) {
-    ns.print("Found threatening move to reduce opponent's liberties!");
-    return threatMove;
-  }
-
-  // 4. Check for territory expansion
-  const expansionMove = findExpansionMove(board, validMoves);
-  if (expansionMove) {
-    ns.print('Found territory expansion move!');
-    return expansionMove;
-  }
-
-  // Collect all potential moves
-  const moves = [];
-  for (let x = 0; x < validMoves.length; x++) {
-    for (let y = 0; y < validMoves[x].length; y++) {
-      if (validMoves[x][y]) {
-        moves.push({ x, y });
-      }
-    }
-  }
-
-  // If no valid moves, pass
-  if (moves.length === 0) return null;
-
-  // If only one valid move, return it
-  if (moves.length === 1) return moves[0];
-
-  // Initialize move statistics
-  const moveStats = {};
-  for (const move of moves) {
-    const key = `${move.x},${move.y}`;
-    moveStats[key] = { visits: 0, wins: 0 };
-  }
-
-  // Run Monte Carlo simulations
-  for (let i = 0; i < config.simulations; i++) {
-    // Pick a move to simulate based on UCB
-    const move = selectMoveUCB(moves, moveStats, config.explorationWeight, i);
-    const key = `${move.x},${move.y}`;
-
-    // Run a simulation for this move
-    const win = simulateGame(board, move);
-
-    // Update move statistics
-    moveStats[key].visits++;
-    moveStats[key].wins += win;
-
-    // Add a small sleep to prevent freezing the game
-    if (config.sleepBetweenSims > 0) {
-      await ns.sleep(config.sleepBetweenSims);
-    }
-  }
-
-  // Select the best move based on win rate
-  let bestMove = null;
-  let bestScore = -Infinity;
-
-  for (const move of moves) {
-    const key = `${move.x},${move.y}`;
-    const stats = moveStats[key];
-
-    // Calculate win rate or use visits if not enough data
-    const score = stats.visits > 0 ? stats.wins / stats.visits : 0;
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
-    }
-  }
-
-  return bestMove;
-}
-
-/**
- * Select a move using UCB formula
- * @param moves - List of valid moves
- * @param moveStats - Statistics for each move
- * @param explorationWeight - UCB exploration parameter
- * @param simulationNum - Current simulation number
- * @returns Selected move
- */
-function selectMoveUCB(
-  moves: Array<any>,
-  moveStats: object,
-  explorationWeight: number,
-  simulationNum: number
-): GoMove {
-  // Use pure exploration for the first moves to ensure all moves are tried
-  if (simulationNum < moves.length) {
-    return moves[simulationNum];
-  }
-
-  let bestMove = null;
-  let bestUCB = -Infinity;
-
-  // Calculate total visits for normalization
-  let totalVisits = 0;
-  for (const move of moves) {
-    const key = `${move.x},${move.y}`;
-    totalVisits += moveStats[key].visits;
-  }
-
-  // Select based on UCB
-  for (const move of moves) {
-    const key = `${move.x},${move.y}`;
-    const stats = moveStats[key];
-
-    // Calculate UCB score
-    let ucb: number;
-    if (stats.visits === 0) {
-      ucb = Infinity; // Ensure unvisited nodes are tried
-    } else {
-      const exploitation = stats.wins / stats.visits;
-      const exploration =
-        explorationWeight * Math.sqrt(Math.log(totalVisits) / stats.visits);
-      ucb = exploitation + exploration;
-    }
-
-    if (ucb > bestUCB) {
-      bestUCB = ucb;
-      bestMove = move;
     }
   }
 
@@ -472,40 +688,35 @@ function selectMoveUCB(
 
 /**
  * Find a move that can capture an opponent's chain
- * @param board - Current board state
- * @param validMoves - Grid of valid moves
- * @param liberties - Grid of liberty counts
- * @returns Capture move or null
  */
 function findCaptureMove(
   board: string[],
   validMoves: boolean[][],
-  liberties: number[][]
+  playerChar: 'X' | 'O'
 ): GoMove | null {
   const size = board.length;
+  const opponentPlayer = playerChar === 'X' ? 'O' : 'X';
+  const visitedOpponent: boolean[][] = Array(size)
+    .fill(null)
+    .map(() => Array(size).fill(false));
 
-  // Look for opponent chains with only one liberty
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      // Check if this is an opponent's piece with exactly 1 liberty
-      if (board[x][y] === 'O' && liberties[x][y] === 1) {
-        // Find the liberty position by checking adjacent points
-        const directions = [
-          [-1, 0],
-          [1, 0],
-          [0, -1],
-          [0, 1],
-        ];
+  // First, check for immediate captures (opponent groups with 1 liberty)
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] === opponentPlayer && !visitedOpponent[r][c]) {
+        const groupInfo = getGroupAndLiberties(board, r, c, opponentPlayer);
+        if (!groupInfo) continue;
+        groupInfo.stones.forEach(
+          (stone) => (visitedOpponent[stone.x][stone.y] = true)
+        );
 
-        for (const [dx, dy] of directions) {
-          const nx = x + dx;
-          const ny = y + dy;
-
-          // Check bounds
-          if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-            // Check if this is an empty point and a valid move
-            if (board[nx][ny] === '.' && validMoves[nx][ny]) {
-              return { x: nx, y: ny };
+        if (groupInfo.uniqueLiberties === 1 && groupInfo.liberties.length > 0) {
+          const capturePoint = groupInfo.liberties[0];
+          if (validMoves[capturePoint.x][capturePoint.y]) {
+            if (
+              !isBadSelfAtari(board, capturePoint.x, capturePoint.y, playerChar)
+            ) {
+              return capturePoint;
             }
           }
         }
@@ -513,217 +724,649 @@ function findCaptureMove(
     }
   }
 
-  return null;
+  // Also check for large opponent groups with 2 liberties - attacking them might be valuable
+  const visited2: boolean[][] = Array(size)
+    .fill(null)
+    .map(() => Array(size).fill(false));
+
+  let bestAttackMove: GoMove | null = null;
+  let largestGroup = 0;
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] === opponentPlayer && !visited2[r][c]) {
+        const groupInfo = getGroupAndLiberties(board, r, c, opponentPlayer);
+        if (!groupInfo) continue;
+        groupInfo.stones.forEach(
+          (stone) => (visited2[stone.x][stone.y] = true)
+        );
+
+        if (
+          groupInfo.uniqueLiberties === 2 &&
+          groupInfo.stones.length > largestGroup
+        ) {
+          // Find the better liberty to attack
+          for (const lib of groupInfo.liberties) {
+            if (
+              validMoves[lib.x][lib.y] &&
+              !isBadSelfAtari(board, lib.x, lib.y, playerChar)
+            ) {
+              bestAttackMove = lib;
+              largestGroup = groupInfo.stones.length;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return bestAttackMove;
 }
 
 /**
  * Find a move to defend one of our threatened chains
- * @param {string[]} board - Current board state
- * @param {boolean[][]} validMoves - Grid of valid moves
- * @param {number[][]} liberties - Grid of liberty counts
- * @returns {Object|null} Defensive move or null
  */
 function findDefendMove(
   board: string[],
   validMoves: boolean[][],
-  liberties: number[][]
+  playerChar: 'X' | 'O'
 ): GoMove | null {
   const size = board.length;
+  const visited: boolean[][] = Array(size)
+    .fill(null)
+    .map(() => Array(size).fill(false));
 
-  // Look for our chains with only one liberty
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      // Check if this is our piece with exactly 1 liberty
-      if (board[x][y] === 'X' && liberties[x][y] === 1) {
-        // Find the liberty position by checking adjacent points
-        const directions = [
-          [-1, 0],
-          [1, 0],
-          [0, -1],
-          [0, 1],
-        ];
+  let bestDefensiveOption: {
+    move: GoMove;
+    type: 'save_1_lib' | 'improve_2_lib';
+    newLibs: number;
+    groupSize: number;
+  } | null = null;
 
-        for (const [dx, dy] of directions) {
-          const nx = x + dx;
-          const ny = y + dy;
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] === playerChar && !visited[r][c]) {
+        const groupInfo = getGroupAndLiberties(board, r, c, playerChar);
+        if (!groupInfo) continue;
+        groupInfo.stones.forEach((stone) => (visited[stone.x][stone.y] = true));
 
-          // Check bounds
-          if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-            // Check if this is an empty point and a valid move
-            if (board[nx][ny] === '.' && validMoves[nx][ny]) {
-              return { x: nx, y: ny };
+        // Priority 1: Save groups in atari (1 liberty)
+        if (groupInfo.uniqueLiberties === 1 && groupInfo.liberties.length > 0) {
+          const libertyPoint = groupInfo.liberties[0];
+          if (validMoves[libertyPoint.x][libertyPoint.y]) {
+            if (
+              !isBadSelfAtari(board, libertyPoint.x, libertyPoint.y, playerChar)
+            ) {
+              const tempBoardAfterDefend = board.map((row, i) =>
+                i === libertyPoint.x
+                  ? row.substring(0, libertyPoint.y) +
+                    playerChar +
+                    row.substring(libertyPoint.y + 1)
+                  : row
+              );
+              const newGroupInfo = getGroupAndLiberties(
+                tempBoardAfterDefend,
+                libertyPoint.x,
+                libertyPoint.y,
+                playerChar
+              );
+              if (newGroupInfo && newGroupInfo.uniqueLiberties > 1) {
+                // This move actually increases liberties
+                if (
+                  !bestDefensiveOption ||
+                  bestDefensiveOption.type !== 'save_1_lib' ||
+                  groupInfo.stones.length > bestDefensiveOption.groupSize
+                ) {
+                  bestDefensiveOption = {
+                    move: libertyPoint,
+                    type: 'save_1_lib',
+                    newLibs: newGroupInfo.uniqueLiberties,
+                    groupSize: groupInfo.stones.length,
+                  };
+                }
+              }
+            }
+          }
+        }
+        // Priority 2: Improve 2-liberty groups
+        else if (groupInfo.uniqueLiberties === 2) {
+          if (bestDefensiveOption && bestDefensiveOption.type === 'save_1_lib')
+            continue; // Prioritize 1-lib saves
+
+          for (const lib of groupInfo.liberties) {
+            if (validMoves[lib.x][lib.y]) {
+              if (!isBadSelfAtari(board, lib.x, lib.y, playerChar)) {
+                const tempBoardAfterPlay = board.map((row, i) =>
+                  i === lib.x
+                    ? row.substring(0, lib.y) +
+                      playerChar +
+                      row.substring(lib.y + 1)
+                    : row
+                );
+                const newGroupInfo = getGroupAndLiberties(
+                  tempBoardAfterPlay,
+                  lib.x,
+                  lib.y,
+                  playerChar
+                );
+                // We want to increase liberties significantly
+                if (newGroupInfo && newGroupInfo.uniqueLiberties > 3) {
+                  if (
+                    !bestDefensiveOption ||
+                    (bestDefensiveOption.type !== 'save_1_lib' &&
+                      (newGroupInfo.uniqueLiberties >
+                        bestDefensiveOption.newLibs ||
+                        groupInfo.stones.length >
+                          bestDefensiveOption.groupSize))
+                  ) {
+                    bestDefensiveOption = {
+                      move: lib,
+                      type: 'improve_2_lib',
+                      newLibs: newGroupInfo.uniqueLiberties,
+                      groupSize: groupInfo.stones.length,
+                    };
+                  }
+                }
+              }
             }
           }
         }
       }
     }
   }
+  return bestDefensiveOption ? bestDefensiveOption.move : null;
+}
+
+/**
+ * Check if there are potential captures that we should pursue (for passing logic)
+ */
+function hasPotentialCaptures(board: string[]): boolean {
+  const size = board.length;
+  const visited: boolean[][] = Array(size)
+    .fill(null)
+    .map(() => Array(size).fill(false));
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] === 'O' && !visited[r][c]) {
+        const groupInfo = getGroupAndLiberties(board, r, c, 'O');
+        if (groupInfo) {
+          groupInfo.stones.forEach((s) => (visited[s.x][s.y] = true));
+          if (groupInfo.uniqueLiberties <= 2) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * NEW: Prioritize strategic opening moves
+ */
+function findOpeningMove(
+  board: string[],
+  validMoves: boolean[][]
+): GoMove | null {
+  const size = board.length;
+  const playerChar = 'X';
+
+  // Count stones to see if we're in opening phase
+  let stoneCount = 0;
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] !== '.') stoneCount++;
+    }
+  }
+
+  // Only use opening strategy in the first ~5 moves
+  if (stoneCount > 10) return null;
+
+  // Opening priorities depend on board size
+  const candidates: GoMove[] = [];
+
+  // Corner approach points (3-3, 4-4, or 3-4 points)
+  const cornerPoints = [];
+  if (size >= 7) {
+    // 3-3 points (more territorial)
+    cornerPoints.push({ x: 2, y: 2 });
+    cornerPoints.push({ x: 2, y: size - 3 });
+    cornerPoints.push({ x: size - 3, y: 2 });
+    cornerPoints.push({ x: size - 3, y: size - 3 });
+
+    // 4-4 points (more influential)
+    if (size >= 9) {
+      cornerPoints.push({ x: 3, y: 3 });
+      cornerPoints.push({ x: 3, y: size - 4 });
+      cornerPoints.push({ x: size - 4, y: 3 });
+      cornerPoints.push({ x: size - 4, y: size - 4 });
+    }
+  }
+
+  // Add all valid corner points to candidates
+  for (const point of cornerPoints) {
+    if (
+      validMoves[point.x][point.y] &&
+      !isBadSelfAtari(board, point.x, point.y, playerChar)
+    ) {
+      candidates.push(point);
+    }
+  }
+
+  // If there are candidates, randomly select one
+  if (candidates.length > 0) {
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  // Fall back to middle point for very small boards
+  if (size <= 5 && validMoves[Math.floor(size / 2)][Math.floor(size / 2)]) {
+    return { x: Math.floor(size / 2), y: Math.floor(size / 2) };
+  }
 
   return null;
 }
 
 /**
- * Simulate a random game from a given move
- * @param board - Current board state
- * @param firstMove - First move to make
- * @returns Score between 0 and 1, higher is better
+ * Select best move using Monte Carlo Tree Search
  */
-function simulateGame(board: string[], firstMove: GoMove): number {
-  const x = firstMove.x;
-  const y = firstMove.y;
-  const size = board.length;
-  let score = 0.5; // Base score
-
-  // Area scoring principles (from user's info):
-  // 1. All stones count as territory
-  // 2. Stones are only removed if captured
-  // 3. Need to actually capture opponent's stones to remove them
-
-  // Check if this move captures opponent stones
-  if (isCapturingMove(board, x, y)) {
-    score += 0.3; // Heavy bonus for capturing moves
+function selectMoveUCB(
+  moves: GoMove[],
+  moveStats: { [key: string]: { visits: number; wins: number } },
+  explorationWeight: number,
+  totalParentSimulations: number // Total simulations run by parent node
+): GoMove {
+  // Ensure all moves get at least one try
+  const unvisitedMoves = moves.filter(
+    (m) =>
+      !moveStats[`${m.x},${m.y}`] || moveStats[`${m.x},${m.y}`].visits === 0
+  );
+  if (unvisitedMoves.length > 0) {
+    return unvisitedMoves[Math.floor(Math.random() * unvisitedMoves.length)];
   }
 
-  // Check if it reduces opponent liberties (potential future capture)
-  if (reducesOpponentLiberties(board, x, y)) {
-    score += 0.2;
-  }
+  let bestMove: GoMove = moves[0];
+  let bestUCB = -Infinity;
 
-  // Check if it's an expanding move that connects to our existing stones
-  if (isExpandingMove(board, x, y)) {
-    score += 0.15;
-  }
+  for (const move of moves) {
+    const key = `${move.x},${move.y}`;
+    const stats = moveStats[key];
 
-  // Prefer moves that have multiple empty neighbors (more liberties)
-  const directions = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
-  let emptyNeighbors = 0;
+    // UCB formula: exploitation + exploration
+    const exploitation = stats.wins / stats.visits;
+    const exploration =
+      explorationWeight *
+      Math.sqrt(Math.log(totalParentSimulations) / stats.visits);
+    const ucb = exploitation + exploration;
 
-  for (const [dx, dy] of directions) {
-    const nx = x + dx;
-    const ny = y + dy;
-
-    if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-      if (board[nx][ny] === '.') {
-        emptyNeighbors++;
-      }
+    if (ucb > bestUCB) {
+      bestUCB = ucb;
+      bestMove = move;
     }
   }
-
-  // Bonus for moves with more empty neighbors (0-4 neighbors)
-  score += 0.05 * emptyNeighbors;
-
-  // Slight preference for center positions over edges
-  const centerDistance = Math.abs(x - size / 2) + Math.abs(y - size / 2);
-  const normalizedDistance = centerDistance / (size - 1);
-  score -= 0.1 * normalizedDistance; // Penalty for edge positions
-
-  return Math.max(0, Math.min(1, score)); // Ensure score stays between 0 and 1
+  return bestMove;
 }
 
 /**
- * Check if a move reduces opponent's liberties
- * @param board - Current board state
- * @param x - X coordinate
- * @param  y - Y coordinate
- * @returns True if it reduces opponent liberties
+ * Simulate a game by playing random moves up to searchDepth
+ * IMPROVED: Now considers territory control in evaluation
  */
-function reducesOpponentLiberties(
+function simulateGame(
+  initialBoard: string[],
+  firstMove: GoMove,
+  playerMakingFirstMove: 'X' | 'O',
+  searchDepth: number,
+  useTerritory: boolean = true
+): number {
+  const R = initialBoard.length;
+  const C = initialBoard[0].length;
+
+  // Apply the first move
+  let currentBoard = applyMoveAndResolveCaptures(
+    initialBoard,
+    firstMove,
+    playerMakingFirstMove
+  );
+  if (!currentBoard) {
+    return 0.0; // Immediate loss for illegal move
+  }
+
+  let currentPlayerInSim: 'X' | 'O' = playerMakingFirstMove === 'X' ? 'O' : 'X';
+  let consecutivePasses = 0;
+
+  // Playout loop
+  for (let i = 0; i < searchDepth; i++) {
+    const validSimMoves = getValidMovesForSimulation(
+      currentBoard,
+      currentPlayerInSim,
+      R,
+      C
+    );
+
+    if (validSimMoves.length === 0) {
+      consecutivePasses++;
+      if (consecutivePasses >= 2) {
+        break; // Game ends after two consecutive passes
+      }
+    } else {
+      consecutivePasses = 0;
+
+      // Prefer good moves in simulation for more realistic results
+      const goodRandomMoves = validSimMoves.filter(
+        (m) => !isBadSelfAtari(currentBoard, m.x, m.y, currentPlayerInSim)
+      );
+
+      const moveOptions =
+        goodRandomMoves.length > 0 ? goodRandomMoves : validSimMoves;
+      const chosenRandomMove =
+        moveOptions[Math.floor(Math.random() * moveOptions.length)];
+
+      if (chosenRandomMove) {
+        const nextBoardState = applyMoveAndResolveCaptures(
+          currentBoard,
+          chosenRandomMove,
+          currentPlayerInSim
+        );
+        if (nextBoardState) {
+          currentBoard = nextBoardState;
+        } else {
+          consecutivePasses++;
+        }
+      } else {
+        consecutivePasses++;
+      }
+    }
+
+    currentPlayerInSim = currentPlayerInSim === 'X' ? 'O' : 'X';
+    if (consecutivePasses >= 2) break;
+  }
+
+  // Evaluate final board state from firstMover's perspective
+  const finalScore = evaluateBoard(
+    currentBoard,
+    playerMakingFirstMove,
+    useTerritory
+  );
+
+  // Convert to win probability [0,1]
+  if (finalScore > 3) return 1.0; // Clear win
+  if (finalScore < -3) return 0.0; // Clear loss
+
+  // For close games, return a probability
+  return (finalScore + 3) / 6;
+}
+
+/**
+ * Find the best move using various strategies
+ */
+async function findBestMove(
+  ns: any,
   board: string[],
-  x: number,
-  y: number
-): boolean {
-  const size = board.length;
-  const directions = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
+  validMoves: boolean[][],
+  config: GoConfig
+): Promise<GoMove | null> {
+  const playerChar = 'X';
 
-  for (const [dx, dy] of directions) {
-    const nx = x + dx;
-    const ny = y + dy;
+  // Check for opening moves first
+  const openingMove = findOpeningMove(board, validMoves);
+  if (openingMove) {
+    ns.print('Found opening move!');
+    return openingMove;
+  }
 
-    if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-      // If adjacent to opponent stone
-      if (board[nx][ny] === 'O') {
-        return true;
+  // Then check for high-priority tactical moves
+  const captureMove = findCaptureMove(board, validMoves, playerChar);
+  if (captureMove) {
+    ns.print('Found high-priority capture move!');
+    return captureMove;
+  }
+
+  const defendMove = findDefendMove(board, validMoves, playerChar);
+  if (defendMove) {
+    ns.print('Found high-priority defensive move!');
+    return defendMove;
+  }
+
+  const threatMove = findThreatMove(board, validMoves);
+  if (threatMove) {
+    ns.print('Found threatening move!');
+    return threatMove;
+  }
+
+  // Get a fallback expansion move
+  const expansionMove = findExpansionMove(board, validMoves);
+
+  // Gather all valid moves for MCTS
+  const moves: GoMove[] = [];
+  for (let x = 0; x < validMoves.length; x++) {
+    for (let y = 0; y < validMoves[x].length; y++) {
+      if (validMoves[x][y]) {
+        if (!isBadSelfAtari(board, x, y, playerChar)) {
+          moves.push({ x, y });
+        }
       }
     }
   }
 
-  return false;
+  if (moves.length === 0) {
+    if (
+      expansionMove &&
+      !isBadSelfAtari(board, expansionMove.x, expansionMove.y, playerChar)
+    )
+      return expansionMove;
+    return null;
+  }
+  if (moves.length === 1) return moves[0];
+
+  // Run MCTS for remaining moves
+  const moveStats: { [key: string]: { visits: number; wins: number } } = {};
+  for (const move of moves) {
+    moveStats[`${move.x},${move.y}`] = { visits: 0, wins: 0 };
+  }
+
+  for (let i = 0; i < config.simulations; i++) {
+    const move = selectMoveUCB(
+      moves,
+      moveStats,
+      config.explorationWeight,
+      i + moves.length
+    );
+    const key = `${move.x},${move.y}`;
+    const win = simulateGame(
+      board,
+      move,
+      playerChar,
+      config.searchDepth,
+      config.useTerritory
+    );
+    moveStats[key].visits++;
+    moveStats[key].wins += win;
+    if (config.sleepBetweenSims > 0) await ns.sleep(config.sleepBetweenSims);
+  }
+
+  // Find best move from MCTS results
+  let bestMove = null;
+  let bestScore = -Infinity;
+
+  // Log MCTS results for debugging
+  if (moves.length < 10) {
+    ns.print('MCTS Results:');
+    for (const move of moves) {
+      const key = `${move.x},${move.y}`;
+      const stats = moveStats[key];
+      if (stats.visits > 0) {
+        const winRate = stats.wins / stats.visits;
+        ns.print(
+          `[${move.x},${move.y}]: ${(winRate * 100).toFixed(1)}% (${stats.visits} visits)`
+        );
+      }
+    }
+  }
+
+  for (const move of moves) {
+    const key = `${move.x},${move.y}`;
+    const stats = moveStats[key];
+    const score = stats.visits > 0 ? stats.wins / stats.visits : 0;
+
+    // Add bonus for pattern matching
+    let adjustedScore = score;
+    if (
+      config.usePatterns &&
+      matchesPattern(board, move.x, move.y, playerChar)
+    ) {
+      adjustedScore += 0.05; // Small bonus for good patterns
+    }
+
+    if (adjustedScore > bestScore) {
+      bestScore = adjustedScore;
+      bestMove = move;
+    }
+  }
+
+  if (!bestMove && expansionMove) {
+    ns.print('MCTS yielded no best move, falling back to heuristic expansion.');
+    return expansionMove;
+  }
+
+  if (!bestMove && moves.length > 0) {
+    ns.print('MCTS failed to select, picking a random valid move.');
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  if (!bestMove) ns.print('No valid moves found. Passing may occur.');
+
+  return bestMove;
 }
 
 /**
- * Check if a move would capture opponent stones
- * @param board - Current board state
- * @param x - X coordinate
- * @param y - Y coordinate
- * @returns True if capturing
+ * Play a full game of Go
  */
-function isCapturingMove(board: string[], x: number, y: number): boolean {
-  const size = board.length;
-  const directions = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
+async function playGame(ns: any, config: GoConfig) {
+  let result: GoMove & { type: 'move' | 'pass' | 'gameOver' };
+  let moveCount = 0;
+  let opponentPassed = false;
+  let ourLastMoveWasPass = false;
 
-  // Check each adjacent point
-  for (const [dx, dy] of directions) {
-    const nx = x + dx;
-    const ny = y + dy;
+  // Track game history to detect ko situations
+  const boardHistory: string[] = [];
 
-    // Check bounds
-    if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-      // If adjacent to opponent stone, might be a capturing move
-      if (board[nx][ny] === 'O') {
-        // Basic check - not a full liberty count calculation
-        // In a real implementation, you would check if the opponent group has only one liberty
-        return true;
+  do {
+    moveCount++;
+    ns.print(`Turn ${moveCount}`);
+
+    const board = ns.go.getBoardState();
+    const validMoves = ns.go.analysis.getValidMoves();
+    const state = ns.go.getGameState();
+
+    // Save board state for ko detection
+    const currentBoardHash = board.join('');
+    boardHistory.push(currentBoardHash);
+    if (boardHistory.length > 4) boardHistory.shift(); // Keep last 4 states
+
+    const ourPlayerChar = 'X';
+    const botScore = state.blackScore;
+    const opponentScore = state.whiteScore;
+
+    // Count stones on the board
+    let playerPinCount = 0;
+    let opponentPinCount = 0;
+    for (const row of board) {
+      for (const cell of row) {
+        if (cell === ourPlayerChar) playerPinCount++;
+        else if (cell !== '.') opponentPinCount++;
       }
     }
+
+    const boardSize = board.length;
+    const totalSpaces = boardSize * boardSize;
+    const filledSpaces = playerPinCount + opponentPinCount;
+    const boardCoverage = filledSpaces / totalSpaces;
+
+    // More conservative passing logic
+    const shouldPass =
+      (opponentPassed && botScore > opponentScore) || // We're clearly winning after opponent pass
+      boardCoverage > 0.95 || // Board is nearly full
+      (opponentPassed && !hasPotentialCaptures(board) && ourLastMoveWasPass); // We already passed once
+
+    if (shouldPass) {
+      ns.print(
+        `Passing: Bot: ${botScore}, Opp: ${opponentScore}, Coverage: ${Math.round(boardCoverage * 100)}%`
+      );
+      result = await ns.go.passTurn();
+      ourLastMoveWasPass = true;
+    } else {
+      const move = await findBestMove(ns, board, validMoves, config);
+      if (move) {
+        ns.print(`Playing move at [${move.x}, ${move.y}]`);
+        result = await ns.go.makeMove(move.x, move.y);
+        ourLastMoveWasPass = false;
+      } else {
+        ns.print('Passing turn - no good moves found');
+        result = await ns.go.passTurn();
+        ourLastMoveWasPass = true;
+      }
+    }
+
+    opponentPassed = result.type === 'pass';
+    if (result.type === 'move')
+      ns.print(`Opponent played at [${result.x}, ${result.y}]`);
+    else if (result.type === 'pass') ns.print('Opponent passed their turn');
+    else if (result.type === 'gameOver') ns.print('Game over!');
+
+    if (result?.type !== 'gameOver') {
+      await ns.go.opponentNextTurn();
+    }
+
+    await ns.sleep(50);
+  } while (result?.type !== 'gameOver');
+
+  const finalState = ns.go.getGameState();
+  const finalBotScore = finalState.blackScore;
+  const finalOpponentScore = finalState.whiteScore;
+
+  ns.print(
+    `Game finished! Score - You ('X'): ${finalBotScore}, Opponent ('O'): ${finalOpponentScore}`
+  );
+
+  // Determine win/loss
+  if (finalBotScore > finalOpponentScore) {
+    ns.print(
+      `Victory! Won by ${(finalBotScore - finalOpponentScore).toFixed(1)} points.`
+    );
+  } else {
+    ns.print(
+      `Defeat. Lost by ${(finalOpponentScore - finalBotScore).toFixed(1)} points.`
+    );
   }
 
-  return false;
+  return finalState;
 }
 
-/**
- * Check if a move expands our territory by connecting to existing stones
- * @param board - Current board state
- * @param x - X coordinate
- * @param y - Y coordinate
- * @returns True if it's an expanding move
- */
-function isExpandingMove(board: string[], x: number, y: number): boolean {
-  const size = board.length;
-  const directions = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ];
+export async function main(ns: any) {
+  disable_logs(ns, ['ALL']);
+  notify(ns, 'IPvGO BOT STARTED');
 
-  // Check each adjacent point
-  for (const [dx, dy] of directions) {
-    const nx = x + dx;
-    const ny = y + dy;
+  const config: GoConfig = {
+    simulations: Number(ns.args[0]) || 500, // Increased from 50
+    searchDepth: Number(ns.args[1]) || 100, // Increased from 5
+    explorationWeight: 1.4, // Tuned from 1.5
+    sleepBetweenSims: 1,
+    useTerritory: true, // Enable territory evaluation
+    usePatterns: false, // Enable pattern matching
+  };
 
-    // Check bounds
-    if (nx >= 0 && nx < size && ny >= 0 && ny < board[nx].length) {
-      // If adjacent to our stone, it's an expanding move
-      if (board[nx][ny] === 'X') {
-        return true;
-      }
-    }
+  const opponent = 'The Black Hand';
+  const boardSize = 5;
+
+  ns.print(`Config: ${JSON.stringify(config)}`);
+
+  while (true) {
+    ns.go.resetBoardState(opponent, boardSize);
+    notify(
+      ns,
+      `Starting new game against ${opponent} on ${boardSize}x${boardSize} grid`
+    );
+    await playGame(ns, config);
+    await ns.sleep(1000);
   }
-
-  return false;
 }
