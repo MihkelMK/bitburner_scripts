@@ -1,3 +1,7 @@
+import { TargetData } from '../types/c2c';
+
+export const SUBLINE_INDENT = 4;
+
 /**
  * Disable certain logs from appearing in CLI output. ALL silences everything.
  * @param ns The Netscript API object.
@@ -7,6 +11,7 @@ export function disable_logs(ns: NS, logs: string[]): void {
   for (var i in logs) {
     ns.disableLog(logs[i]);
   }
+  ns.clearLog();
 }
 
 /**
@@ -35,36 +40,48 @@ export function notify(
 }
 
 /**
- * Formats a number to abbreviated notation (K, M, B, T)
- * @param ns Netscript
- * @param value The value to format.
- * @param decimals Number of decimal places to show (defaults to 1).
- * @return Formatted string.
+ * Command log with indent and without timestamp to be used after a notify
+ * @param ns The Netscript API object.
+ * @param message The message to log.
+ * @param indentLevel How many times to indent message
  */
-export function formatNumber(
-  ns: NS,
-  value: number | null | undefined,
-  decimals: number | undefined = undefined
-): string {
-  const isInteger = decimals === 0;
+export function inform(ns: NS, message: string, indentLevel: number = 1): void {
+  if (!message) return;
 
-  return ns.formatNumber(value, decimals, undefined, isInteger);
+  ns.print(' '.repeat(indentLevel * SUBLINE_INDENT) + message);
 }
 
 /**
  * Formats a number to abbreviated currency notation (K, M, B, T)
  * @param ns Netscript
  * @param value The monetary value to format.
- * @param decimals Number of decimal places to show (defaults to 1).
+ * @param decimals Number of decimal places to show (defaults to 3).
  * @param currency Currency symbol to prepend (defaults to '$').
  * @return Formatted currency string.
  */
 export function formatCurrency(
   ns: NS,
   value: number | null | undefined,
-  decimals: number = 1,
+  decimals: number | undefined = undefined,
   currency: string = '$'
 ): string {
-  const formattedNumber: string = formatNumber(ns, value, decimals);
+  const formattedNumber: string = ns.formatNumber(value, decimals);
   return `${currency}${formattedNumber}`;
+}
+
+export function enum_target(ns: NS, server: string): TargetData {
+  return {
+    money: {
+      max: ns.getServerMaxMoney(server),
+      current: ns.getServerMoneyAvailable(server),
+    },
+    security: {
+      min: ns.getServerMinSecurityLevel(server),
+      base: ns.getServerBaseSecurityLevel(server),
+      current: ns.getServerSecurityLevel(server),
+    },
+    growth: ns.getServerGrowth(server),
+    time: ns.getHackTime(server),
+    chance: ns.hackAnalyzeChance(server),
+  };
 }
