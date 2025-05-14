@@ -45,7 +45,7 @@ export function notify(
  * @param message The message to log.
  * @param indentLevel How many times to indent message
  */
-export function inform(ns: NS, message: string, indentLevel: number = 1): void {
+export function inform(ns: NS, message: string, indentLevel: number = 0): void {
   if (!message) return;
 
   ns.print(' '.repeat(indentLevel * SUBLINE_INDENT) + message);
