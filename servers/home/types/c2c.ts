@@ -2,6 +2,7 @@ export interface CommandConfig {
   src: string;
   mult?: number; // mult is optional as it's not on ddos/share
   targeted: boolean;
+  ram: number;
 }
 
 export interface Commands {

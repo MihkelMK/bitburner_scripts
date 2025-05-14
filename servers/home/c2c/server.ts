@@ -21,26 +21,29 @@ const TIMEOUT_SEC = 10;
 const TIMEOUT_MIN = 1;
 
 const SCRIPTS_DIR = 'c2c/actions/';
-// const COMMANDS: Commands = {
-//   hack: { src: "hack.js", mult: 0.05, targeted: true },
-//   grow: { src: "grow.js", mult: 0.775, targeted: true },
-//   weaken: {
-//     src: "weaken.js", mult: 0.175, targeted: true
-//   },
-//   ddos: { src: "grow.js", targeted: true },
-//   share: { src: "share_ram.js", targeted: false }
-// }
 const COMMANDS: Commands = {
-  hack: { src: 'hack.js', mult: 0.15, targeted: true },
-  grow: { src: 'grow.js', mult: 0.6, targeted: true },
+  hack: { src: 'hack.js', mult: 0.05, targeted: true, ram: 1.7 },
+  grow: { src: 'grow.js', mult: 0.775, targeted: true, ram: 1.75 },
   weaken: {
     src: 'weaken.js',
-    mult: 0.25,
+    mult: 0.175,
     targeted: true,
+    ram: 1.75,
   },
-  ddos: { src: 'grow.js', targeted: true },
-  share: { src: 'share_ram.js', targeted: false },
+  ddos: { src: 'grow.js', targeted: true, ram: 1.75 },
+  share: { src: 'share_ram.js', targeted: false, ram: 4 },
 };
+// const COMMANDS: Commands = {
+//   hack: { src: 'hack.js', mult: 0.15, targeted: true },
+//   grow: { src: 'grow.js', mult: 0.6, targeted: true },
+//   weaken: {
+//     src: 'weaken.js',
+//     mult: 0.25,
+//     targeted: true,
+//   },
+//   ddos: { src: 'grow.js', targeted: true },
+//   share: { src: 'share_ram.js', targeted: false },
+// };
 // const COMMANDS: Commands = {
 //   hack: { src: "hack.js", mult: 0.0, targeted: true },
 //   grow: { src: "grow.js", mult: 0.7, targeted: true },
@@ -50,6 +53,12 @@ const COMMANDS: Commands = {
 //   ddos: { src: "grow.js", targeted: true },
 //   share: { src: "share_ram.js", targeted: false }
 // }
+
+// Calculate total RAM needed for one "set" of scripts in the desired ratio
+const SET_RAM =
+  COMMANDS.hack.mult * COMMANDS.hack.ram +
+  COMMANDS.grow.mult * COMMANDS.grow.ram +
+  COMMANDS.weaken.mult * COMMANDS.weaken.ram;
 
 const BASE_ALLOCATION = {
   grow: 0,
@@ -294,21 +303,8 @@ export function c2c_setup(
     killAndCopy(ns, server);
   }
 
-  // Allocate threads proportionally
-  const scriptRams = {
-    hack: ns.getScriptRam(SCRIPTS_DIR + COMMANDS.hack.src),
-    grow: ns.getScriptRam(SCRIPTS_DIR + COMMANDS.grow.src),
-    weaken: ns.getScriptRam(SCRIPTS_DIR + COMMANDS.weaken.src),
-  };
-
-  // Calculate total RAM needed for one "set" of scripts in the desired ratio
-  const setRam =
-    COMMANDS.hack.mult * scriptRams.hack +
-    COMMANDS.grow.mult * scriptRams.grow +
-    COMMANDS.weaken.mult * scriptRams.weaken;
-
   // Calculate how many complete sets we can fit
-  const sets = Math.floor(availableRam / setRam);
+  const sets = Math.floor(availableRam / SET_RAM);
 
   let hackThreads = 0;
   let growThreads = 0;
@@ -317,7 +313,7 @@ export function c2c_setup(
   if (sets <= 0) {
     notify(ns, `${server} | Not enough RAM for even set`);
     // Launch grow with max threads
-    growThreads = Math.floor(availableRam / scriptRams.grow);
+    growThreads = Math.floor(availableRam / COMMANDS.grow.ram);
   } else {
     // Launch all scripts with calculated threads
     hackThreads = Math.floor(sets * COMMANDS.hack.mult);
@@ -638,7 +634,10 @@ function hack_setup(
     return [];
   }
 
-  const minRamPerTarget = 32; // Too small numbers throw off balance between hack/grow/weaken
+  // We need so many sets per target, so that Math.floot(sets * hack.mult) > 1
+  // I'm not sure why we have to * 2, but anything less would result with 0 hack
+  const minRamPerTarget =
+    SET_RAM * Math.pow(10, -Math.floor(Math.log10(COMMANDS.hack.mult) + 1)) * 2;
   const maxTargets = Math.max(Math.floor(availableRam / minRamPerTarget), 1);
 
   const targets: Target[] = Array(maxTargets)
