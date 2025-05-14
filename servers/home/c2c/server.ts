@@ -502,7 +502,6 @@ function optimize_server_allocation(
   }
 }
 
-/** @param {NS} ns */
 function enforceHomeReservation(ns: NS, c2c_state: C2CState): boolean {
   if (c2c_state.reserved_on_home <= 0) return false;
 
@@ -757,7 +756,6 @@ function getFreeRAM(ns: NS, server: string, reserved_on_home: number) {
   return server === 'home' ? maxRam - allocated - reserved_on_home : maxRam;
 }
 
-/** @param {NS} ns */
 export async function main(ns: NS) {
   disable_logs(ns, [
     'scan',
