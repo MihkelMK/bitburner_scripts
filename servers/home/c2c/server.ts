@@ -216,10 +216,10 @@ function printServerTaskStats(
       const hackPercent = ns.formatPercent(tasks.hack / totalTasks, 1);
 
       // Format values
-      const growValue = ns.formatNumber(tasks.grow, 0);
-      const weakenValue = ns.formatNumber(tasks.weaken, 0);
-      const hackValue = ns.formatNumber(tasks.hack, 0);
-      const totalValue = ns.formatNumber(totalTasks, 0);
+      const growValue = ns.formatNumber(tasks.grow, 1, undefined, true);
+      const weakenValue = ns.formatNumber(tasks.weaken, 1, undefined, true);
+      const hackValue = ns.formatNumber(tasks.hack, 1, undefined, true);
+      const totalValue = ns.formatNumber(totalTasks, 1, undefined, true);
 
       // Update column widths based on content
       updateColumnWidth(columnWidths, 'hostname', hostname);
