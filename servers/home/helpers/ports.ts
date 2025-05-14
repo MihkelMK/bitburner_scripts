@@ -4,6 +4,7 @@ export const TARGET_PORT = 9002;
 export const HOME_RESERVE_PORT = 9003;
 
 export const ENUM_PID_PORT = 8000;
+export const TRADE_TOTAL_PORT = 8001;
 
 export const ALL_PORTS = [
   STATE_PORT,
@@ -11,4 +12,5 @@ export const ALL_PORTS = [
   TARGET_PORT,
   HOME_RESERVE_PORT,
   ENUM_PID_PORT,
+  TRADE_TOTAL_PORT,
 ];

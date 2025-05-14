@@ -1,4 +1,6 @@
 import { disable_logs, formatCurrency, notify } from '../helpers/cli.js';
+import { TRADE_TOTAL_PORT } from '../helpers/ports.js';
+import { setupMonitor } from '../utils/port_monitor.js';
 
 const OPERATION_COST = 100000; // do not change this is fixed in the game
 
@@ -6,12 +8,14 @@ const MAX_STOCK_OWNED_PERCENT = 0.75; // maximum percentages of stock that can b
 const MIN_FORECAST_PERCENT = 0.1; // min forecast percent from 0.5
 const MIN_PURCHASE_MILLION = 500; // min total purchase cost in millions
 const MIN_EXIT_FORECAST_PERCENT = 0.05; // in case the forecast turn under this value than exit.
-const KEEP_MONEY_ON_HOME_MILLION = 1000; // how many million you want to keep out from trading (like for use it for something else)
+const KEEP_MONEY_ON_HOME_MILLION = 10; // how many million you want to keep out from trading (like for use it for something else)
 
 interface OwnedSymbol {
   sym: string;
   sharesShort: number;
   shares: number;
+  avgLongPrice: number;
+  avgShortPrice: number;
 }
 
 function availableMoney(ns: NS): number {
@@ -53,8 +57,9 @@ function getOwnedSymbols(tix: TIX): OwnedSymbol[] {
   const symbols = tix
     .getSymbols()
     .map((sym) => {
-      const [shares, , sharesShort] = tix.getPosition(sym);
-      return { sym, sharesShort, shares };
+      const [shares, avgLongPrice, sharesShort, avgShortPrice] =
+        tix.getPosition(sym);
+      return { sym, sharesShort, shares, avgLongPrice, avgShortPrice };
     })
     .filter((sym) => sym.sharesShort > 0 || sym.shares > 0);
   return symbols;
@@ -123,6 +128,7 @@ export async function main(ns: NS) {
     'stock.purchaseTixApi',
     'stock.purchase4SMarketDataTixApi',
   ]);
+  setupMonitor(ns, TRADE_TOTAL_PORT, 'Trading Bot');
   notify(ns, 'TRADING BOT STARTED');
 
   const tix = ns.stock;
@@ -136,11 +142,15 @@ export async function main(ns: NS) {
     }
 
     const money = availableMoney(ns) - OPERATION_COST;
+    let totalInvested = 0;
 
     const owned = getOwnedSymbols(tix);
     for (let i in owned) {
-      const { sym, shares } = owned[i];
+      const { sym, shares, sharesShort, avgShortPrice, avgLongPrice } =
+        owned[i];
       const forecast = tix.getForecast(sym);
+
+      totalInvested += shares * avgLongPrice + sharesShort * avgShortPrice;
 
       if (shares > 0 && forecast - MIN_EXIT_FORECAST_PERCENT <= 0.5) {
         const sellPrice = tix.sellStock(sym, shares);
@@ -189,6 +199,11 @@ export async function main(ns: NS) {
       }
     }
 
+    ns.clearPort(TRADE_TOTAL_PORT);
+    ns.writePort(
+      TRADE_TOTAL_PORT,
+      `Total invested: ${formatCurrency(ns, totalInvested)}`
+    );
     await tix.nextUpdate();
   }
 }
