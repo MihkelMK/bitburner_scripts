@@ -13,6 +13,16 @@ export function autocomplete(_: AutocompleteData, args: string[]): number[] {
   return ALL_PORTS;
 }
 
+export function prettifyPortData(value: string) {
+  // Pretty print if JSON data
+  try {
+    const json = JSON.parse(value);
+    return JSON.stringify(json, null, 1);
+  } catch {
+    return value;
+  }
+}
+
 export async function main(ns: NS) {
   const args = ns.flags([['help', false]]);
   ns.print(args);
@@ -28,11 +38,6 @@ export async function main(ns: NS) {
   const port = args._[0];
   const value = ns.peek(port);
 
-  // Pretty print if JSON data
-  try {
-    const json = JSON.parse(value);
-    ns.tprint(JSON.stringify(json, null, 1));
-  } catch {
-    ns.tprintf(value);
-  }
+  const prettyValue = prettifyPortData(value);
+  ns.tprint(prettyValue);
 }
