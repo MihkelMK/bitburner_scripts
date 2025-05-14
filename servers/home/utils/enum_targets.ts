@@ -1,4 +1,9 @@
-import { enum_target, formatCurrency } from '../helpers/cli';
+import {
+  calcTailHeight,
+  calcTailWidth,
+  enum_target,
+  formatCurrency,
+} from '../helpers/cli';
 import { ENUM_PID_PORT, TARGET_PORT } from '../helpers/ports';
 import { Target } from '../types/c2c';
 
@@ -195,8 +200,8 @@ export async function main(ns: NS) {
   ns.ui.openTail();
 
   if (height > 0 && width > 0) {
-    const windowWidth = width * (FONT_SIZE * 0.625); // 0.81 is a magic number
-    const windowHeight = height * FONT_SIZE * 1.575 + 35; // 2.075 is a magic number, 35 is estimate on titlebar height
+    const windowWidth = calcTailWidth(width);
+    const windowHeight = calcTailHeight(height);
     ns.ui.resizeTail(windowWidth, windowHeight);
   }
 }

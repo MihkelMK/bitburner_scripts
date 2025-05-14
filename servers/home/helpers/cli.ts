@@ -2,6 +2,20 @@ import { TargetData } from '../types/c2c';
 
 export const SUBLINE_INDENT = 4;
 
+// Size tail window to match output
+export const TAIL_WIDTH_MULT = 0.625; // Magic number - multipy with character count
+export const TAIL_HEIGHT_MULT = 1.575; // Magic number - multipy with row count
+export const TAIL_TITLEBAR_HEIGHT = 35; // Add to tail window height to offset title height
+export const TAIL_FONT_SIZE = 16;
+
+export function calcTailHeight(row_count: number): number {
+  return row_count * TAIL_FONT_SIZE * TAIL_HEIGHT_MULT + TAIL_TITLEBAR_HEIGHT;
+}
+
+export function calcTailWidth(longestRowCharCount: number): number {
+  return longestRowCharCount * TAIL_FONT_SIZE * TAIL_WIDTH_MULT;
+}
+
 /**
  * Disable certain logs from appearing in CLI output. ALL silences everything.
  * @param ns The Netscript API object.
