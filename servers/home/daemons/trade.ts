@@ -1,4 +1,12 @@
-import { disable_logs, formatCurrency, notify } from '../helpers/cli.js';
+import {
+  disable_logs,
+  formatCurrency,
+  notify,
+  TAIL_BODY_FONT_SIZE,
+  TAIL_HEIGHT_MULT,
+  TAIL_TITLEBAR_OFFSET,
+  TAIL_WIDTH_MULT,
+} from '../helpers/cli.js';
 import { TRADE_TOTAL_PORT } from '../helpers/ports.js';
 import { setupMonitor } from '../utils/port_monitor.js';
 
@@ -8,7 +16,7 @@ const MAX_STOCK_OWNED_PERCENT = 0.75; // maximum percentages of stock that can b
 const MIN_FORECAST_PERCENT = 0.1; // min forecast percent from 0.5
 const MIN_PURCHASE_MILLION = 500; // min total purchase cost in millions
 const MIN_EXIT_FORECAST_PERCENT = 0.05; // in case the forecast turn under this value than exit.
-const KEEP_MONEY_ON_HOME_MILLION = 10; // how many million you want to keep out from trading (like for use it for something else)
+const KEEP_MONEY_ON_HOME_MILLION = 100; // how many million you want to keep out from trading (like for use it for something else)
 
 interface OwnedSymbol {
   sym: string;
@@ -127,8 +135,13 @@ export async function main(ns: NS) {
     'stock.purchase4SMarketData',
     'stock.purchaseTixApi',
     'stock.purchase4SMarketDataTixApi',
+    'run',
   ]);
-  setupMonitor(ns, TRADE_TOTAL_PORT, 'Trading Bot');
+  setupMonitor(ns, TRADE_TOTAL_PORT, 'Portfolio', {
+    x: -13 - 71 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT,
+    y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
+    align: 'left',
+  });
   notify(ns, 'TRADING BOT STARTED');
 
   const tix = ns.stock;
@@ -200,10 +213,7 @@ export async function main(ns: NS) {
     }
 
     ns.clearPort(TRADE_TOTAL_PORT);
-    ns.writePort(
-      TRADE_TOTAL_PORT,
-      `Total invested: ${formatCurrency(ns, totalInvested)}`
-    );
+    ns.writePort(TRADE_TOTAL_PORT, formatCurrency(ns, totalInvested));
     await tix.nextUpdate();
   }
 }

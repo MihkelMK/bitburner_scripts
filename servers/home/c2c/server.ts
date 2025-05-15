@@ -12,8 +12,18 @@ import {
   GOAL_PORT,
   TARGET_PORT,
   HOME_RESERVE_PORT,
+  C2C_MONITOR_PORT,
 } from '../helpers/ports';
-import { disable_logs, notify, inform } from '../helpers/cli';
+import {
+  disable_logs,
+  notify,
+  inform,
+  TAIL_TITLEBAR_OFFSET,
+  TAIL_HEIGHT_MULT,
+  TAIL_BODY_FONT_SIZE,
+  TAIL_TITLE_PADDING,
+} from '../helpers/cli';
+import { setupMonitor } from '../utils/port_monitor';
 
 const IGNORE = ['darkweb'];
 
@@ -162,17 +172,19 @@ function printC2CAssign(ns: NS, data: ServerAllocation[], title: string) {
   });
 }
 
-function printServerTaskStats(
+function generateAllocationTable(
   ns: NS,
   serverData: { [key: string]: ServerAllocation }
-) {
+): string {
+  const output = [];
   try {
     notify(ns, 'Printing C2C state');
+    output.push('Allocation Table');
 
     // Create a safety check for empty or invalid serverData
     if (!serverData || Object.keys(serverData).length === 0) {
       notify(ns, 'No server allocation data available.');
-      return;
+      return '';
     }
 
     // Initialize column widths with minimum values
@@ -250,8 +262,7 @@ function printServerTaskStats(
     const header = `| ${padStringLeft('hostname', columnWidths.hostname)} | ${padStringCenter('grow', growColWidth)} | ${padStringCenter('weaken', weakenColWidth)} | ${padStringCenter('hack', hackColWidth)} | ${padStringRight('total', columnWidths.total)} |`;
     const separator = `| ${'-'.repeat(columnWidths.hostname)} | ${'-'.repeat(growColWidth)} | ${'-'.repeat(weakenColWidth)} | ${'-'.repeat(hackColWidth)} | ${'-'.repeat(columnWidths.total)} |`;
 
-    inform(ns, header);
-    inform(ns, separator);
+    output.push(header, separator);
 
     // Print each row with dynamic widths
     for (const row of tableRows) {
@@ -261,13 +272,14 @@ function printServerTaskStats(
       const hackText = `${padStringRight(row.hackValue, columnWidths.hackValue)} (${row.hackPercent})`;
 
       const formattedRow = `| ${padStringLeft(row.hostname, columnWidths.hostname)} | ${padStringRight(growText, growColWidth)} | ${padStringRight(weakenText, weakenColWidth)} | ${padStringRight(hackText, hackColWidth)} | ${padStringRight(row.totalValue, columnWidths.total)} |`;
-      inform(ns, formattedRow);
+      output.push(formattedRow);
     }
 
-    inform(ns, '\n');
+    return output.join('\n');
   } catch (error) {
     // Catch any errors in the table printing
     notify(ns, `Error printing table: ${error}`);
+    return '';
   }
 }
 
@@ -770,6 +782,10 @@ export async function main(ns: NS) {
     'getServerMaxRam',
     'sleep',
   ]);
+  setupMonitor(ns, C2C_MONITOR_PORT, 'C2C State', {
+    x: -12,
+    y: -20,
+  });
   notify(ns, 'C2C SERVER STARTED');
 
   let useless = [...IGNORE];
@@ -916,15 +932,15 @@ export async function main(ns: NS) {
       continue;
     }
 
-    const reservationEnforced = enforceHomeReservation(ns, c2c_state);
-    if (reservationEnforced) {
-      // If we killed scripts, update our state
-      const isHome = (server: string) => server === 'home';
-      c2c_state.hack = c2c_state.hack.filter((server) => !isHome(server));
-      c2c_state.grow = c2c_state.grow.filter((server) => !isHome(server));
-      c2c_state.weaken = c2c_state.weaken.filter((server) => !isHome(server));
-      c2c_state.ddos = c2c_state.ddos.filter((server) => !isHome(server));
-      c2c_state.share = c2c_state.share.filter((server) => !isHome(server));
+    try {
+      const allocationTable = generateAllocationTable(
+        ns,
+        c2c_state.allocations
+      );
+      ns.clearPort(C2C_MONITOR_PORT);
+      ns.writePort(C2C_MONITOR_PORT, allocationTable);
+    } catch (tableError) {
+      notify(ns, `Error in table printing: ${tableError}`);
     }
 
     let servers = Array(ns.scan())[0];
@@ -1083,14 +1099,19 @@ export async function main(ns: NS) {
       i += 1;
     }
 
+    const reservationEnforced = enforceHomeReservation(ns, c2c_state);
+    if (reservationEnforced) {
+      // If we killed scripts, update our state
+      const isHome = (server: string) => server === 'home';
+      c2c_state.hack = c2c_state.hack.filter((server) => !isHome(server));
+      c2c_state.grow = c2c_state.grow.filter((server) => !isHome(server));
+      c2c_state.weaken = c2c_state.weaken.filter((server) => !isHome(server));
+      c2c_state.ddos = c2c_state.ddos.filter((server) => !isHome(server));
+      c2c_state.share = c2c_state.share.filter((server) => !isHome(server));
+    }
+
     ns.clearPort(STATE_PORT);
     ns.writePort(STATE_PORT, JSON.stringify(c2c_state));
-
-    try {
-      printServerTaskStats(ns, c2c_state.allocations);
-    } catch (tableError) {
-      notify(ns, `Error in table printing: ${tableError}`);
-    }
 
     // Add explicit delay to prevent infinite loops
     notify(ns, `Sleeping for ${TIMEOUT_MIN} minutes...`);

@@ -1,4 +1,13 @@
-import { disable_logs, notify } from '../helpers/cli';
+import {
+  disable_logs,
+  notify,
+  TAIL_BODY_FONT_SIZE,
+  TAIL_HEIGHT_MULT,
+  TAIL_TITLEBAR_OFFSET,
+  TAIL_WIDTH_MULT,
+} from '../helpers/cli';
+import { IPVGO_MONITOR_PORT } from '../helpers/ports';
+import { setupMonitor } from '../utils/port_monitor';
 
 interface GoMove {
   x: number;
@@ -1100,7 +1109,7 @@ function simulateGame(
  * Find the best move using various strategies
  */
 async function findBestMove(
-  ns: any,
+  ns: NS,
   board: string[],
   validMoves: boolean[][],
   config: GoConfig
@@ -1241,7 +1250,7 @@ async function findBestMove(
 /**
  * Play a full game of Go
  */
-async function playGame(ns: any, config: GoConfig) {
+async function playGame(ns: NS, config: GoConfig) {
   let result: GoMove & { type: 'move' | 'pass' | 'gameOver' };
   let moveCount = 0;
   let opponentPassed = false;
@@ -1320,30 +1329,15 @@ async function playGame(ns: any, config: GoConfig) {
     await ns.sleep(50);
   } while (result?.type !== 'gameOver');
 
-  const finalState = ns.go.getGameState();
-  const finalBotScore = finalState.blackScore;
-  const finalOpponentScore = finalState.whiteScore;
-
-  ns.print(
-    `Game finished! Score - You ('X'): ${finalBotScore}, Opponent ('O'): ${finalOpponentScore}`
-  );
-
-  // Determine win/loss
-  if (finalBotScore > finalOpponentScore) {
-    ns.print(
-      `Victory! Won by ${(finalBotScore - finalOpponentScore).toFixed(1)} points.`
-    );
-  } else {
-    ns.print(
-      `Defeat. Lost by ${(finalOpponentScore - finalBotScore).toFixed(1)} points.`
-    );
-  }
-
-  return finalState;
+  return ns.go.getGameState();
 }
 
-export async function main(ns: any) {
+export async function main(ns: NS) {
   disable_logs(ns, ['ALL']);
+  setupMonitor(ns, IPVGO_MONITOR_PORT, 'IPvGO', {
+    x: -13,
+    y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
+  });
   notify(ns, 'IPvGO BOT STARTED');
 
   const config: GoConfig = {
@@ -1355,18 +1349,43 @@ export async function main(ns: any) {
     usePatterns: false, // Enable pattern matching
   };
 
+  // const opponent = 'Daedalus';
+  // const boardSize = 5;
   const opponent = 'The Black Hand';
   const boardSize = 5;
 
   ns.print(`Config: ${JSON.stringify(config)}`);
+  let totalWins = 0;
+  let totalLosses = 0;
 
   while (true) {
+    ns.clearPort(IPVGO_MONITOR_PORT);
+    ns.writePort(
+      IPVGO_MONITOR_PORT,
+      `W/L ${ns.formatNumber(totalWins, 0)}/${ns.formatNumber(totalLosses, 0)}; ${ns.formatPercent(totalWins / totalLosses || 0, 0)}`
+    );
+
     ns.go.resetBoardState(opponent, boardSize);
     notify(
       ns,
       `Starting new game against ${opponent} on ${boardSize}x${boardSize} grid`
     );
-    await playGame(ns, config);
+    const finalState = await playGame(ns, config);
+
+    const finalBotScore = finalState.blackScore;
+    const finalOpponentScore = finalState.whiteScore;
+
+    ns.print(
+      `Game finished! Score - You ('X'): ${finalBotScore}, Opponent ('O'): ${finalOpponentScore}`
+    );
+
+    // Determine win/loss
+    if (finalBotScore > finalOpponentScore) {
+      totalWins++;
+    } else {
+      totalLosses++;
+    }
+
     await ns.sleep(1000);
   }
 }

@@ -1,4 +1,14 @@
-import { disable_logs, formatCurrency, notify } from '../helpers/cli.js';
+import {
+  disable_logs,
+  formatCurrency,
+  notify,
+  TAIL_BODY_FONT_SIZE,
+  TAIL_HEIGHT_MULT,
+  TAIL_TITLEBAR_OFFSET,
+  TAIL_WIDTH_MULT,
+} from '../helpers/cli.js';
+import { SERVER_RAM_PORT } from '../helpers/ports.js';
+import { setupMonitor } from '../utils/port_monitor.js';
 
 function buy_cost(ns: NS, ram: number): number {
   return ns.getPurchasedServerCost(ram);
@@ -6,6 +16,11 @@ function buy_cost(ns: NS, ram: number): number {
 
 function grow_cost(ns: NS, ram: number, hostname: string): number {
   return ns.getPurchasedServerUpgradeCost(hostname, ram);
+}
+
+function monitorMessage(ns: NS, count: number, ram: number) {
+  ns.clearPort(SERVER_RAM_PORT);
+  ns.writePort(SERVER_RAM_PORT, `${count}x${ns.formatRam(ram, 0)}`);
 }
 
 export async function main(ns: NS) {
@@ -20,6 +35,11 @@ export async function main(ns: NS) {
     'getPurchasedServerUpgradeCost',
     'purchaseServer',
   ]);
+  setupMonitor(ns, SERVER_RAM_PORT, 'Servers', {
+    x: -25.5 - (71 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT) / 2,
+    y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
+    align: 'center',
+  });
   notify(ns, 'SERVER FARM STARTED');
 
   // C2C action takes 1.7GB so 2 is enough to start
@@ -42,6 +62,7 @@ export async function main(ns: NS) {
       waiting = true;
     }
 
+    monitorMessage(ns, ns.getPurchasedServers().length, first_ram);
     await ns.sleep(1000);
   }
 
@@ -72,9 +93,11 @@ export async function main(ns: NS) {
         waiting = true;
       }
 
+      monitorMessage(ns, servers.length, ram);
       await ns.sleep(1000);
     }
 
+    monitorMessage(ns, servers.length, ram);
     notify(ns, servers.length + ' servers now ' + ram + ' GB', 'bs');
 
     ram = ram * 2; // RAM goes up in steps of power of 2
