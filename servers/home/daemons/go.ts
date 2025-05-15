@@ -4,7 +4,6 @@ import {
   TAIL_BODY_FONT_SIZE,
   TAIL_HEIGHT_MULT,
   TAIL_TITLEBAR_OFFSET,
-  TAIL_WIDTH_MULT,
 } from '../helpers/cli';
 import { IPVGO_MONITOR_PORT } from '../helpers/ports';
 import { setupMonitor } from '../utils/port_monitor';

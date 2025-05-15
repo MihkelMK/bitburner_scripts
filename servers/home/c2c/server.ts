@@ -14,15 +14,7 @@ import {
   HOME_RESERVE_PORT,
   C2C_MONITOR_PORT,
 } from '../helpers/ports';
-import {
-  disable_logs,
-  notify,
-  inform,
-  TAIL_TITLEBAR_OFFSET,
-  TAIL_HEIGHT_MULT,
-  TAIL_BODY_FONT_SIZE,
-  TAIL_TITLE_PADDING,
-} from '../helpers/cli';
+import { disable_logs, notify, inform } from '../helpers/cli';
 import { setupMonitor } from '../utils/port_monitor';
 
 const IGNORE = ['darkweb'];
