@@ -200,7 +200,7 @@ export async function main(ns: NS) {
   ns.ui.openTail();
 
   if (height > 0 && width > 0) {
-    const windowWidth = calcTailWidth(width);
+    const windowWidth = calcTailWidth(width, ns.getScriptName());
     const windowHeight = calcTailHeight(height);
     ns.ui.resizeTail(windowWidth, windowHeight);
   }

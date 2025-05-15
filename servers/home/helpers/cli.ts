@@ -3,17 +3,33 @@ import { TargetData } from '../types/c2c';
 export const SUBLINE_INDENT = 4;
 
 // Size tail window to match output
+export const TAIL_BODY_FONT_SIZE = 16;
+export const TAIL_TITLE_FONT_SIZE = 20;
+
 export const TAIL_WIDTH_MULT = 0.625; // Magic number - multipy with character count
 export const TAIL_HEIGHT_MULT = 1.575; // Magic number - multipy with row count
-export const TAIL_TITLEBAR_HEIGHT = 35; // Add to tail window height to offset title height
-export const TAIL_FONT_SIZE = 16;
+export const TAIL_TITLEBAR_OFFSET = 35; // Add to tail window height to offset title height
+export const TAIL_TITLE_BUTTON_OFFSET = 25 * 3; // Add to titlebar width (3 x button width)
+export const TAIL_TITLE_PADDING = TAIL_TITLE_FONT_SIZE / 2; // So that min width doesn't have title and buttons touching
 
 export function calcTailHeight(row_count: number): number {
-  return row_count * TAIL_FONT_SIZE * TAIL_HEIGHT_MULT + TAIL_TITLEBAR_HEIGHT;
+  return (
+    row_count * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT + TAIL_TITLEBAR_OFFSET
+  );
 }
 
-export function calcTailWidth(longestRowCharCount: number): number {
-  return longestRowCharCount * TAIL_FONT_SIZE * TAIL_WIDTH_MULT;
+export function calcTailWidth(
+  longestRowCharCount: number,
+  title: string
+): number {
+  const titleWidth =
+    title.length * TAIL_TITLE_FONT_SIZE * TAIL_WIDTH_MULT +
+    TAIL_TITLE_BUTTON_OFFSET +
+    TAIL_TITLE_PADDING;
+  const contentWidth =
+    longestRowCharCount * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT;
+
+  return Math.max(titleWidth, contentWidth);
 }
 
 /**
