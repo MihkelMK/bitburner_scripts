@@ -93,7 +93,7 @@ export async function main(ns: NS) {
         waiting = true;
       }
 
-      monitorMessage(ns, servers.length, ram);
+      monitorMessage(ns, i, ram);
       await ns.sleep(1000);
     }
 
