@@ -1,6 +1,6 @@
 import { enum_target } from '../helpers/cli.js';
 import { TARGET_PORT } from '../helpers/ports.js';
-import { Target } from '../types/c2c.js';
+import { Target } from '../../../types/c2c.js';
 
 /**
  * @param data - context about the game, useful when autocompleting

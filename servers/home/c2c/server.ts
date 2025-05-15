@@ -5,7 +5,7 @@ import {
   ServerAllocation,
   Target,
   TaskAllocation,
-} from '../types/c2c';
+} from '../../../types/c2c';
 
 import {
   STATE_PORT,

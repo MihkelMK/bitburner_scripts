@@ -1,4 +1,4 @@
-import { TargetData } from '../types/c2c';
+import { TargetData } from '../../../types/c2c';
 
 export const SUBLINE_INDENT = 4;
 

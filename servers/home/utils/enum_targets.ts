@@ -5,7 +5,7 @@ import {
   formatCurrency,
 } from '../helpers/cli';
 import { ENUM_PID_PORT, TARGET_PORT } from '../helpers/ports';
-import { Target } from '../types/c2c';
+import { Target } from '../../../types/c2c';
 
 const FONT_SIZE = 16;
 

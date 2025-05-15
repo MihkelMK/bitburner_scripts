@@ -1,5 +1,5 @@
 import { disable_logs, notify } from '../helpers/cli';
-import { HacksDictionary } from '../types/c2c';
+import { HacksDictionary } from '../../../types/c2c';
 import { connectWithHops } from '../utils/connect_with_hops';
 
 const IGNORE = ['darkweb', 'home'];
