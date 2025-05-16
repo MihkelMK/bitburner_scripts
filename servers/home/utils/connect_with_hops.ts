@@ -9,7 +9,14 @@ export function autocomplete(data: AutocompleteData, args: string[]): string[] {
   const servers = data.servers;
 
   if (args[0]) {
-    return servers.filter((server) => server.startsWith(args[0]));
+    const filtered = servers.filter((server) =>
+      server.toLowerCase().startsWith(args[0].toLowerCase())
+    );
+
+    if (filtered.length === 1 && args[0] === filtered[0]) {
+      return;
+    }
+    return filtered;
   }
 
   return servers;
