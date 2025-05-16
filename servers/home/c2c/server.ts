@@ -287,12 +287,9 @@ function killAndCopy(ns: NS, server: string) {
     // Kill all current scripts on the server
     ns.killall(server);
 
-    // Copy all necessary scripts to the server
-    Object.values(COMMANDS)
-      .filter((cmd) => cmd.targeted)
-      .forEach((cmd) => {
-        ns.scp(SCRIPTS_DIR + cmd.src, server, 'home');
-      });
+    Object.values(COMMANDS).forEach((cmd) => {
+      ns.scp(SCRIPTS_DIR + cmd.src, server, 'home');
+    });
   }
 }
 
