@@ -35,8 +35,8 @@ export async function main(ns: NS) {
     'getPurchasedServerUpgradeCost',
     'purchaseServer',
   ]);
-  setupMonitor(ns, SERVER_RAM_PORT, 'Servers', {
-    x: -25.5 - (71 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT) / 2,
+  setupMonitor(ns, ns.pid, SERVER_RAM_PORT, 'Servers', {
+    x: -38.5 - (72 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT) / 2,
     y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
     align: 'center',
   });

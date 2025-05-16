@@ -771,7 +771,7 @@ export async function main(ns: NS) {
     'getServerMaxRam',
     'sleep',
   ]);
-  setupMonitor(ns, C2C_MONITOR_PORT, 'C2C State', {
+  setupMonitor(ns, ns.pid, C2C_MONITOR_PORT, 'C2C State', {
     x: -12,
     y: -20,
   });
@@ -819,6 +819,9 @@ export async function main(ns: NS) {
   }
 
   while (true) {
+    ns.clearPort(STATE_PORT);
+    ns.writePort(STATE_PORT, JSON.stringify(c2c_state));
+
     const goal_port_data = ns.peek(GOAL_PORT);
     const target_port_data = ns.peek(TARGET_PORT);
     const home_reserv_port_data = ns.peek(HOME_RESERVE_PORT);

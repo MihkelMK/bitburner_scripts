@@ -1333,7 +1333,7 @@ async function playGame(ns: NS, config: GoConfig) {
 
 export async function main(ns: NS) {
   disable_logs(ns, ['ALL']);
-  setupMonitor(ns, IPVGO_MONITOR_PORT, 'IPvGO', {
+  setupMonitor(ns, ns.pid, IPVGO_MONITOR_PORT, 'IPvGO', {
     x: -13,
     y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
   });

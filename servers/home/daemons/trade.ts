@@ -137,8 +137,8 @@ export async function main(ns: NS) {
     'stock.purchase4SMarketDataTixApi',
     'run',
   ]);
-  setupMonitor(ns, TRADE_TOTAL_PORT, 'Portfolio', {
-    x: -13 - 71 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT,
+  setupMonitor(ns, ns.pid, TRADE_TOTAL_PORT, 'Portfolio', {
+    x: -13 - 72 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT,
     y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
     align: 'left',
   });
