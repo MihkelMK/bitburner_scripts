@@ -10,6 +10,7 @@ export const TRADE_TRANSACTIONS_PORT = 8003;
 export const SERVER_RAM_PORT = 8004;
 export const IPVGO_MONITOR_PORT = 8005;
 export const C2C_MONITOR_PORT = 8006;
+export const RED_PILL_PORT = 8007;
 
 export const ALL_PORTS = [
   STATE_PORT,
@@ -22,4 +23,5 @@ export const ALL_PORTS = [
   SERVER_RAM_PORT,
   IPVGO_MONITOR_PORT,
   C2C_MONITOR_PORT,
+  RED_PILL_PORT,
 ];
