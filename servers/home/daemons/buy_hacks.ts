@@ -1,6 +1,8 @@
-import { notify } from '../helpers/cli';
+import { disable_logs, formatCurrency, notify } from '../helpers/cli';
 
 export async function main(ns: NS) {
+  disable_logs(ns, ['sleep', 'getServerMoneyAvailable']);
+
   while (true) {
     if (!ns.hasTorRouter()) {
       ns.singularity.purchaseTor();
@@ -14,11 +16,14 @@ export async function main(ns: NS) {
       const script = available[i];
 
       if (!ns.fileExists(script)) {
-        ns.print(script);
         if (
           ns.singularity.getDarkwebProgramCost(script) <=
           ns.getServerMoneyAvailable('home')
         ) {
+          notify(
+            ns,
+            `Trying to buy ${script} for ${formatCurrency(ns, ns.singularity.getDarkwebProgramCost(script))}`
+          );
           waiting = waiting || !ns.singularity.purchaseProgram(script);
         } else {
           waiting = true;
@@ -31,6 +36,7 @@ export async function main(ns: NS) {
       ns.exit();
     }
 
-    await ns.sleep(1000 * 60 * 2);
+    notify(ns, 'Waiting 1 minute for money');
+    await ns.sleep(1000 * 60 * 1);
   }
 }
