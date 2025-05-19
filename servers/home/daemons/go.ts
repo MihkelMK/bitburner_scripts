@@ -1,3 +1,4 @@
+import { GoOpponent } from '@/NetscriptDefinitions';
 import {
   disable_logs,
   notify,
@@ -1348,10 +1349,12 @@ export async function main(ns: NS) {
     usePatterns: false, // Enable pattern matching
   };
 
-  // const opponent = 'Daedalus';
-  // const boardSize = 5;
-  const opponent = 'The Black Hand';
-  const boardSize = 5;
+  const opponent: GoOpponent = (ns.args[0] || 'The Black Hand') as GoOpponent;
+  const boardSize = (ns.args.length > 1 ? Number(ns.args[1]) : 5) as
+    | 9
+    | 5
+    | 7
+    | 13;
 
   ns.print(`Config: ${JSON.stringify(config)}`);
   let totalWins = 0;
