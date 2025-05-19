@@ -2,10 +2,7 @@ import {
   disable_logs,
   formatCurrency,
   notify,
-  TAIL_BODY_FONT_SIZE,
-  TAIL_HEIGHT_MULT,
-  TAIL_TITLEBAR_OFFSET,
-  TAIL_WIDTH_MULT,
+  padStringLeft,
 } from '../helpers/cli.js';
 import { SERVER_RAM_PORT } from '../helpers/ports.js';
 import { setupMonitor } from '../utils/port_monitor.js';
@@ -19,8 +16,12 @@ function grow_cost(ns: NS, ram: number, hostname: string): number {
 }
 
 function monitorMessage(ns: NS, count: number, ram: number) {
+  const cost = grow_cost(ns, ram, ns.getPurchasedServers().at(-1));
   ns.clearPort(SERVER_RAM_PORT);
-  ns.writePort(SERVER_RAM_PORT, `${count}x${ns.formatRam(ram, 0)}`);
+  ns.writePort(
+    SERVER_RAM_PORT,
+    `${ns.getPurchasedServerLimit()}x${ns.formatRam(ram / 2, 0)}\n${padStringLeft(formatCurrency(ns, cost), 10)} ${count}x${ns.formatRam(ram, 0)}`
+  );
 }
 
 export async function main(ns: NS) {
@@ -36,9 +37,8 @@ export async function main(ns: NS) {
     'purchaseServer',
   ]);
   setupMonitor(ns, ns.pid, SERVER_RAM_PORT, 'Servers', {
-    x: -38.5 - (72 * TAIL_BODY_FONT_SIZE * TAIL_WIDTH_MULT) / 2,
-    y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
-    align: 'center',
+    x: -9,
+    y: -32,
   });
   notify(ns, 'SERVER FARM STARTED');
 
@@ -70,6 +70,8 @@ export async function main(ns: NS) {
   const servers = ns.getPurchasedServers();
   while (ram < ns.getPurchasedServerMaxRam()) {
     let i = 0;
+    let alreadyAtThisRAM = true;
+
     while (i < servers.length) {
       const hostname = servers[i];
 
@@ -77,6 +79,8 @@ export async function main(ns: NS) {
         i++;
         continue;
       }
+
+      alreadyAtThisRAM = false;
 
       const neededMoney = grow_cost(ns, ram, hostname);
       if (ns.getServerMoneyAvailable('home') > neededMoney) {
@@ -98,7 +102,9 @@ export async function main(ns: NS) {
     }
 
     monitorMessage(ns, servers.length, ram);
-    notify(ns, servers.length + ' servers now ' + ram + ' GB', 'bs');
+    if (!alreadyAtThisRAM) {
+      notify(ns, servers.length + ' servers now ' + ram + ' GB', 'bs');
+    }
 
     ram = ram * 2; // RAM goes up in steps of power of 2
     await ns.sleep(1000);
