@@ -87,6 +87,9 @@ export async function main(ns: NS) {
     'sqlinject',
     'relaysmtp',
   ]);
+
+  const runOnce = ns.args[0];
+
   while (true) {
     let hacks_dict = {
       brute: ns.fileExists('BruteSSH.exe'),
@@ -105,6 +108,7 @@ export async function main(ns: NS) {
 
     let i = 0;
     let waiting = false;
+    let serverAdded = false;
     while (i < servers.length) {
       let server = servers[i];
       let serverObj = ns.getServer(server);
@@ -118,7 +122,9 @@ export async function main(ns: NS) {
         if (!serverObj.hasAdminRights) {
           waiting = false;
           notify(ns, 'Attempting to hack ' + server);
-          hack_target(ns, server, hacks_dict);
+          if (!hack_target(ns, server, hacks_dict)) {
+            waiting = true;
+          }
 
           await ns.sleep(1000);
         }
@@ -129,6 +135,7 @@ export async function main(ns: NS) {
           if (await backdoor_target(ns, server)) {
             notify(ns, 'Backdoored ' + server);
           } else {
+            waiting = true;
             notify(ns, "Couldn't backdoor " + server);
           }
 
@@ -143,9 +150,15 @@ export async function main(ns: NS) {
         if (!serv_set.has(con)) {
           serv_set.add(con);
           servers.push(con);
+          serverAdded = true;
         }
       }
       i += 1;
+    }
+
+    // We have hacked all servers available
+    if (runOnce && !serverAdded) {
+      ns.exit();
     }
 
     if (!waiting) {
