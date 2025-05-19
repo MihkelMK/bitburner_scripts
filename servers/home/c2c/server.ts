@@ -758,8 +758,8 @@ export async function main(ns: NS) {
     'sleep',
   ]);
   setupMonitor(ns, ns.pid, C2C_MONITOR_PORT, 'C2C State', {
-    x: -12,
-    y: -20,
+    x: -8,
+    y: 11,
   });
   notify(ns, 'C2C SERVER STARTED');
 
