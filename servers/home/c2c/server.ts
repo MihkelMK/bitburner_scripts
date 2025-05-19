@@ -622,8 +622,11 @@ function hack_setup(
 
   // We need so many sets per target, so that Math.floot(sets * hack.mult) > 1
   // I'm not sure why we have to * 2, but anything less would result with 0 hack
-  const minRamPerTarget =
-    SET_RAM * Math.pow(10, -Math.floor(Math.log10(COMMANDS.hack.mult) + 1)) * 4;
+  // Clamp to availableRam / 10 to optimize CPU usage
+  const minRamPerTarget = Math.max(
+    SET_RAM * Math.pow(10, -Math.floor(Math.log10(COMMANDS.hack.mult) + 1)) * 2,
+    availableRam / 10
+  );
   const maxTargets = Math.max(Math.floor(availableRam / minRamPerTarget), 1);
 
   const targets: Target[] = Array(maxTargets)
