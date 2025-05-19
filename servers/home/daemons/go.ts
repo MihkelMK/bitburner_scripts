@@ -1335,8 +1335,10 @@ async function playGame(ns: NS, config: GoConfig) {
 export async function main(ns: NS) {
   disable_logs(ns, ['ALL']);
   setupMonitor(ns, ns.pid, IPVGO_MONITOR_PORT, 'IPvGO', {
-    x: -13,
-    y: -32 - TAIL_TITLEBAR_OFFSET - 7 * TAIL_BODY_FONT_SIZE * TAIL_HEIGHT_MULT,
+    x: -9,
+    y:
+      -32 -
+      (TAIL_TITLEBAR_OFFSET + TAIL_BODY_FONT_SIZE * 2 * TAIL_HEIGHT_MULT + 11),
   });
   notify(ns, 'IPvGO BOT STARTED');
 
@@ -1364,7 +1366,7 @@ export async function main(ns: NS) {
     ns.clearPort(IPVGO_MONITOR_PORT);
     ns.writePort(
       IPVGO_MONITOR_PORT,
-      `W/L ${ns.formatNumber(totalWins, 0)}/${ns.formatNumber(totalLosses, 0)}; ${ns.formatPercent(totalWins / totalLosses || 0, 0)}`
+      `W/L ${ns.formatNumber(totalWins, 0)}/${ns.formatNumber(totalLosses, 0)}\n${opponent}`
     );
 
     ns.go.resetBoardState(opponent, boardSize);
