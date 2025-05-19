@@ -484,11 +484,6 @@ function areServersMaxxed(ns: NS): boolean {
 }
 
 function checkRequirements(ns: NS, tix: TIX): boolean {
-  if (!areServersMaxxed(ns)) {
-    notify(ns, 'Waiting for max servers');
-    return false;
-  }
-
   if (!tix.purchaseWseAccount()) {
     notify(ns, 'Waiting for money to buy WSE account');
     return false;
@@ -590,6 +585,13 @@ export async function main(ns: NS) {
           );
         }
       }
+    }
+
+    // This requirement is only needed for buying
+    if (!areServersMaxxed(ns)) {
+      notify(ns, 'Waiting for max servers');
+      await ns.sleep(1000 * 60 * 2);
+      continue;
     }
 
     if (canBuy(money)) {
