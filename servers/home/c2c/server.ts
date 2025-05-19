@@ -14,7 +14,14 @@ import {
   HOME_RESERVE_PORT,
   C2C_MONITOR_PORT,
 } from '../helpers/ports';
-import { disable_logs, notify, inform } from '../helpers/cli';
+import {
+  disable_logs,
+  notify,
+  inform,
+  padStringRight,
+  padStringCenter,
+  padStringLeft,
+} from '../helpers/cli';
 import { setupMonitor } from '../utils/port_monitor';
 
 const IGNORE = ['darkweb'];
@@ -80,27 +87,6 @@ const BASE_C2C_STATE = {
   targets: [],
   reserved_on_home: 0,
 };
-
-// Helper function to pad strings to specified width
-function padStringLeft(str: string, width: number) {
-  return str.toString().padEnd(width);
-}
-
-// Helper function to right-align string to specified width
-function padStringRight(str: string, width: number) {
-  return str.toString().padStart(width);
-}
-
-// Helper function to right-align string to specified width
-function padStringCenter(str: string, width: number) {
-  const text = str.toString();
-  const textWidth = text.length;
-
-  const totalPadding = width - textWidth;
-  const halfPadded = textWidth + totalPadding / 2;
-
-  return str.toString().padStart(halfPadded).padEnd(width);
-}
 
 // Helper function to update column width based on content
 function updateColumnWidth(

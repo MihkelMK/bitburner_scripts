@@ -115,3 +115,24 @@ export function enum_target(ns: NS, server: string): TargetData {
     chance: ns.hackAnalyzeChance(server),
   };
 }
+
+// Helper function to pad strings to specified width
+export function padStringLeft(str: string, width: number) {
+  return str.toString().padEnd(width);
+}
+
+// Helper function to right-align string to specified width
+export function padStringRight(str: string, width: number) {
+  return str.toString().padStart(width);
+}
+
+// Helper function to right-align string to specified width
+export function padStringCenter(str: string, width: number) {
+  const text = str.toString();
+  const textWidth = text.length;
+
+  const totalPadding = width - textWidth;
+  const halfPadded = textWidth + totalPadding / 2;
+
+  return str.toString().padStart(halfPadded).padEnd(width);
+}
